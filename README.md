@@ -1,31 +1,24 @@
-# 動画フレーム式 10m疾走分析アプリ
+# Top Speed Sprint Analyzer
 
-Vite + React のWebアプリです。動画ファイルはブラウザ内で読み込むだけで、サーバーにはアップロードされません。
-
-## ローカル実行
-
-```bash
-npm install
-npm run dev
-```
-
-## ビルド確認
-
-```bash
-npm run build
-npm run preview
-```
+動画フレームから10m区間の最高速度、100m予想タイム、最高速度時ピッチ、最高速度時ストライドを算出するWebアプリです。
 
 ## Vercel設定
 
 - Framework Preset: Vite
-- Build Command: `npm run build`
-- Output Directory: `dist`
-- Install Command: `npm install`
-- Root Directory: 空欄（リポジトリ直下に `package.json` がある場合）
+- Root Directory: 空欄（リポジトリ直下）
+- Install Command: npm install
+- Build Command: npm run build
+- Output Directory: dist
 
-リポジトリ直下に `package.json`, `index.html`, `vite.config.js`, `vercel.json`, `src/` がある状態にしてください。
+## ローカル確認
+
+```bash
+npm install
+npm run dev
+npm run build
+```
 
 ## 注意
 
-`vercel.json` にはSPA用のrewriteを入れています。
+動画ファイルはブラウザ内で読み込まれるだけで、サーバーにはアップロードされません。
+正確なコマ判定のため、120fps以上のスロー動画を推奨します。
