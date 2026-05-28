@@ -87,16 +87,11 @@ function inferFpsFromFileName(name) {
   return fps > 0 ? fps : NaN;
 }
 
-function detectFpsFromVideoElement(video) {
-  try {
-    const stream = video?.captureStream?.() || video?.mozCaptureStream?.();
-    const track = stream?.getVideoTracks?.()[0];
-    const fps = track?.getSettings?.().frameRate;
-    stream?.getTracks?.().forEach((t) => t.stop());
-    return Number.isFinite(fps) && fps > 0 ? fps : NaN;
-  } catch {
-    return NaN;
-  }
+// ブラウザ標準のvideo要素からは、実際の撮影fpsを常に正確に取得できません。
+// そのため、ファイル名に「240fps」などが含まれる場合だけ自動反映し、
+// 基本は撮影時のfpsをユーザーが動画上部で確認・指定する設計にします。
+function detectFpsFromVideoElement() {
+  return NaN;
 }
 
 function predict100mTime(speed) {
@@ -316,7 +311,8 @@ export default function App() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [currentFrame, setCurrentFrame] = useState('');
-  const [fpsStatus, setFpsStatus] = useState('動画を読み込むとfpsを自動推定します。必要に応じて手入力で修正できます。');
+  const [fpsStatus, setFpsStatus] = useState('ファイル名に240fpsなどが含まれる場合は自動反映します。ずれる場合は撮影時のfpsをここで指定してください。');
+  const [videoError, setVideoError] = useState('');
   const [showPredictionInfo, setShowPredictionInfo] = useState(false);
   const videoRef = useRef(null);
 
@@ -396,13 +392,14 @@ export default function App() {
     setCurrentFrame('');
     setVideoCurrentTime(0);
     setVideoDuration(0);
+    setVideoError('');
 
     const inferred = normalizeFps(inferFpsFromFileName(file.name));
     if (Number.isFinite(inferred)) {
       applyFpsToAllRows(inferred);
       setFpsStatus(`ファイル名から ${inferred} fps と推定しました。撮影設定と異なる場合は手入力またはプリセットで修正してください。`);
     } else {
-      setFpsStatus('動画を読み込み中です。読み込み後にブラウザで取得できる範囲のfps情報を確認します。取得できない場合は撮影設定のfpsを手入力してください。');
+      setFpsStatus('動画を読み込みました。fpsは動画ファイルから正確に取得できない場合が多いため、撮影時のfpsを上の欄で確認・指定してください。');
     }
   };
 
@@ -416,22 +413,15 @@ export default function App() {
   };
 
   const estimateFpsFromVideo = () => {
-    const video = videoRef.current;
     const nameFps = normalizeFps(inferFpsFromFileName(videoName));
     if (Number.isFinite(nameFps)) {
       applyFpsToAllRows(nameFps);
-      setFpsStatus(`ファイル名から ${nameFps} fps と推定しました。ずれる場合は手入力またはプリセットで修正してください。`);
+      setFpsStatus(`ファイル名から ${nameFps} fps と推定しました。ずれる場合は撮影時のfpsを手入力またはプリセットで指定してください。`);
+      window.requestAnimationFrame(syncCurrentFrame);
       return;
     }
 
-    const elementFps = normalizeFps(detectFpsFromVideoElement(video));
-    if (Number.isFinite(elementFps)) {
-      applyFpsToAllRows(elementFps);
-      setFpsStatus(`ブラウザが取得できる動画情報から ${elementFps} fps と推定しました。高fps動画では実際の撮影fpsと異なる場合があるため、撮影設定を確認してください。`);
-      return;
-    }
-
-    setFpsStatus('このブラウザでは動画ファイルの真のfpsを直接取得できませんでした。撮影時のfpsを手入力するか、120/240/300fpsなどのプリセットを選んでください。');
+    setFpsStatus('ブラウザでは動画の真の撮影fpsを安定して取得できません。撮影時の設定に合わせて、上のfps欄またはプリセットで指定してください。');
   };
 
   const handleLoadedMetadata = () => {
@@ -440,6 +430,23 @@ export default function App() {
     setVideoDuration(Number.isFinite(video.duration) ? video.duration : 0);
     syncCurrentFrame();
     estimateFpsFromVideo();
+  };
+
+  const handleVideoError = () => {
+    const video = videoRef.current;
+    const code = video?.error?.code;
+    const message = code ? `動画の読み込み・再生でエラーが発生しました（code: ${code}）。iPhoneのHEVC/HDR動画などはブラウザによって黒画面になることがあります。H.264形式のMP4に変換するか、Safariなど対応ブラウザで確認してください。` : '動画の読み込み・再生でエラーが発生しました。H.264形式のMP4での利用を推奨します。';
+    setVideoError(message);
+  };
+
+  const refreshAfterSeek = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      video.requestVideoFrameCallback(() => syncCurrentFrame());
+    } else {
+      setTimeout(syncCurrentFrame, 90);
+    }
   };
 
   const seekFrame = (delta) => {
@@ -454,8 +461,9 @@ export default function App() {
     const targetTime = targetFrame / fps;
     setCurrentFrame(String(targetFrame));
     setVideoCurrentTime(targetTime);
-    video.currentTime = targetTime;
-    window.requestAnimationFrame(() => syncCurrentFrame());
+    // ぴったりの時刻にseekしつつ、seek後にフレーム描画完了を待って同期します。
+    video.currentTime = Math.min(video.duration || targetTime, Math.max(0, targetTime));
+    refreshAfterSeek();
   };
 
   const seekToTime = (time) => {
@@ -464,7 +472,7 @@ export default function App() {
     video.pause();
     video.currentTime = Math.max(0, Math.min(video.duration || Infinity, time));
     setVideoCurrentTime(video.currentTime);
-    setTimeout(syncCurrentFrame, 20);
+    refreshAfterSeek();
   };
 
   const setFrameFromVideo = (key) => {
@@ -555,22 +563,54 @@ export default function App() {
 
       <section className="card">
         <h2>動画コマ送り・位置指定</h2>
+        <div className="fpsTopPanel">
+          <div className="fpsTopHeader">
+            <div>
+              <strong>フレームレートの確認・指定</strong>
+              <p>fpsがずれると、現在コマ・通過タイム・接地/滞空時間がすべてずれます。撮影時のfpsを指定してください。</p>
+            </div>
+            <button className="secondary" onClick={estimateFpsFromVideo} disabled={!videoUrl}>ファイル名から確認</button>
+          </div>
+          <div className="fpsControls">
+            <label className="field">
+              <span>フレームレート</span>
+              <div className="withUnit"><input inputMode="decimal" value={selectedRow?.fps || ''} onChange={(e) => updateRow(selectedRow.id, 'fps', e.target.value)} /><span>fps</span></div>
+            </label>
+            <label className="field">
+              <span>現在の推定フレーム</span>
+              <input value={currentFrame} readOnly placeholder="—" />
+            </label>
+            <div className="fpsPresetRow top">
+              <span>プリセット：</span>
+              {[120, 240, 300, 480, 960].map((fps) => (
+                <button key={fps} className="chipButton" onClick={() => setFpsPreset(fps)}>{fps}fps</button>
+              ))}
+            </div>
+          </div>
+          <p className="fpsStatusTop">{fpsStatus}</p>
+        </div>
+
         <div className="videoBox">
           {videoUrl ? (
             <video
+              key={videoUrl}
               ref={videoRef}
               src={videoUrl}
               controls
+              playsInline
+              preload="auto"
               onTimeUpdate={syncCurrentFrame}
-              onSeeked={syncCurrentFrame}
+              onSeeked={() => { syncCurrentFrame(); refreshAfterSeek(); }}
               onLoadedData={syncCurrentFrame}
               onCanPlay={syncCurrentFrame}
               onLoadedMetadata={handleLoadedMetadata}
+              onError={handleVideoError}
             />
           ) : (
             <div className="videoPlaceholder">動画を選択してください</div>
           )}
         </div>
+        {videoError && <div className="videoError">⚠ {videoError}</div>}
 
         <div className="registerPanel">
           <div className="targetInstruction">
@@ -584,12 +624,14 @@ export default function App() {
             </div>
           </div>
 
-          <div className="frameButtons">
-            <button className="secondary" onClick={() => seekFrame(-10)} disabled={!videoUrl}>⏪ -10</button>
-            <button className="secondary" onClick={() => seekFrame(-1)} disabled={!videoUrl}>◀ -1</button>
+          <div className="frameControlPanel">
+            <div className="frameStepRow">
+              <button className="secondary" onClick={() => seekFrame(-10)} disabled={!videoUrl}>⏪ -10</button>
+              <button className="secondary" onClick={() => seekFrame(-1)} disabled={!videoUrl}>◀ -1</button>
+              <button className="secondary" onClick={() => seekFrame(1)} disabled={!videoUrl}>+1 ▶</button>
+              <button className="secondary" onClick={() => seekFrame(10)} disabled={!videoUrl}>+10 ⏩</button>
+            </div>
             <button className="primary registerButton" onClick={registerCurrentFrame} disabled={!videoUrl || !activeEvent}>✓ 現在コマを登録</button>
-            <button className="secondary" onClick={() => seekFrame(1)} disabled={!videoUrl}>+1 ▶</button>
-            <button className="secondary" onClick={() => seekFrame(10)} disabled={!videoUrl}>+10 ⏩</button>
           </div>
 
           <div className="statusLine">
@@ -613,25 +655,6 @@ export default function App() {
             onChange={(e) => seekToTime(Number(e.target.value))}
             disabled={!videoUrl || !videoDuration}
           />
-        </div>
-
-        <div className="formGrid fpsGrid">
-          <Field label="フレームレート">
-            <div className="withUnit"><input inputMode="decimal" value={selectedRow?.fps || ''} onChange={(e) => updateRow(selectedRow.id, 'fps', e.target.value)} /><span>fps</span></div>
-          </Field>
-          <Field label="現在の推定フレーム">
-            <input value={currentFrame} readOnly placeholder="—" />
-          </Field>
-          <div className="field alignEnd">
-            <button className="secondary" onClick={estimateFpsFromVideo} disabled={!videoUrl}>fpsを確認</button>
-          </div>
-        </div>
-        <div className="fpsPresetRow">
-          <span>プリセット：</span>
-          <button className="chipButton" onClick={() => setFpsPreset(120)}>120fps</button>
-          <button className="chipButton" onClick={() => setFpsPreset(240)}>240fps</button>
-          <button className="chipButton" onClick={() => setFpsPreset(300)}>300fps</button>
-          <button className="chipButton" onClick={() => setFpsPreset(480)}>480fps</button>
         </div>
 
       </section>

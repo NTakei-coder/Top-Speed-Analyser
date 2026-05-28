@@ -698,3 +698,115 @@ td input {
     gap: 4px;
   }
 }
+
+.fpsTopPanel {
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  background: #f8fafc;
+  padding: 16px;
+}
+
+.fpsTopHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.fpsTopHeader strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.fpsTopHeader p,
+.fpsStatusTop {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.65;
+  font-size: 0.9rem;
+}
+
+.fpsControls {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(180px, 260px) 1fr;
+  gap: 14px;
+  align-items: end;
+}
+
+.fpsPresetRow.top {
+  margin-top: 0;
+  align-self: end;
+}
+
+.fpsStatusTop {
+  margin-top: 12px;
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px;
+}
+
+.videoError {
+  margin-top: 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 18px;
+  background: #fffbeb;
+  color: #92400e;
+  padding: 14px;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.videoBox video {
+  height: auto;
+  min-height: 240px;
+  object-fit: contain;
+}
+
+.frameControlPanel {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.frameStepRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.frameStepRow button {
+  min-height: 54px;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+
+.frameControlPanel .registerButton {
+  width: 100%;
+  min-height: 62px !important;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 1120px) {
+  .fpsTopHeader,
+  .fpsControls {
+    grid-template-columns: 1fr;
+  }
+
+  .fpsTopHeader {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 700px) {
+  .frameStepRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .videoBox video {
+    min-height: 180px;
+  }
+}
