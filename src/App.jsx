@@ -87,6 +87,18 @@ function inferFpsFromFileName(name) {
   return fps > 0 ? fps : NaN;
 }
 
+function detectFpsFromVideoElement(video) {
+  try {
+    const stream = video?.captureStream?.() || video?.mozCaptureStream?.();
+    const track = stream?.getVideoTracks?.()[0];
+    const fps = track?.getSettings?.().frameRate;
+    stream?.getTracks?.().forEach((t) => t.stop());
+    return Number.isFinite(fps) && fps > 0 ? fps : NaN;
+  } catch {
+    return NaN;
+  }
+}
+
 function predict100mTime(speed) {
   if (!(speed > 0)) return NaN;
   return PREDICTION_A + PREDICTION_B / speed;
@@ -329,6 +341,12 @@ export default function App() {
     setRows((prev) => prev.map((row) => ({ ...row, fps: String(fps) })));
   };
 
+  const setFpsPreset = (fps) => {
+    applyFpsToAllRows(fps);
+    setFpsStatus(`${fps} fps に設定しました。撮影時の設定と一致しているか確認してください。`);
+    window.requestAnimationFrame(syncCurrentFrame);
+  };
+
   const addRow = () => {
     const last = rows[rows.length - 1] || makeInitialRow();
     const newRow = {
@@ -382,9 +400,9 @@ export default function App() {
     const inferred = normalizeFps(inferFpsFromFileName(file.name));
     if (Number.isFinite(inferred)) {
       applyFpsToAllRows(inferred);
-      setFpsStatus(`ファイル名から ${inferred} fps と推定しました。動画フレームからも確認します。`);
+      setFpsStatus(`ファイル名から ${inferred} fps と推定しました。撮影設定と異なる場合は手入力またはプリセットで修正してください。`);
     } else {
-      setFpsStatus('動画を読み込み中です。読み込み後にフレーム情報からfpsを推定します。');
+      setFpsStatus('動画を読み込み中です。読み込み後にブラウザで取得できる範囲のfps情報を確認します。取得できない場合は撮影設定のfpsを手入力してください。');
     }
   };
 
@@ -397,85 +415,23 @@ export default function App() {
     return frame;
   };
 
-  const estimateFpsFromVideo = async () => {
+  const estimateFpsFromVideo = () => {
     const video = videoRef.current;
-    if (!video) return;
-    if (typeof video.requestVideoFrameCallback !== 'function') {
-      setFpsStatus('このブラウザでは動画フレームからのfps自動推定に対応していません。fpsを手入力してください。');
-      return;
-    }
-    if (!Number.isFinite(video.duration) || video.duration <= 0) {
-      setFpsStatus('動画の長さを取得できませんでした。fpsを手入力してください。');
+    const nameFps = normalizeFps(inferFpsFromFileName(videoName));
+    if (Number.isFinite(nameFps)) {
+      applyFpsToAllRows(nameFps);
+      setFpsStatus(`ファイル名から ${nameFps} fps と推定しました。ずれる場合は手入力またはプリセットで修正してください。`);
       return;
     }
 
-    setFpsStatus('動画フレームからfpsを推定中です。推定値がずれる場合は手入力で修正してください。');
-
-    const originalTime = video.currentTime || 0;
-    const wasPaused = video.paused;
-    const originalMuted = video.muted;
-    const startTime = Math.min(Math.max(originalTime, 0), Math.max(video.duration - 1.5, 0));
-    const samples = [];
-    let finished = false;
-
-    try {
-      video.pause();
-      video.muted = true;
-      video.currentTime = startTime;
-      await new Promise((resolve) => setTimeout(resolve, 120));
-
-      const samplePromise = new Promise((resolve) => {
-        const startedAt = performance.now();
-        const handler = (now, metadata) => {
-          if (finished) return;
-          samples.push({ mediaTime: metadata.mediaTime, presentedFrames: metadata.presentedFrames });
-          const first = samples[0];
-          const last = samples[samples.length - 1];
-          const mediaDelta = last.mediaTime - first.mediaTime;
-          const enoughMedia = samples.length >= 12 && mediaDelta >= 0.35;
-          const tooManySamples = samples.length >= 90;
-          const timeout = performance.now() - startedAt > 2800;
-          if (enoughMedia || tooManySamples || timeout) {
-            finished = true;
-            resolve();
-            return;
-          }
-          video.requestVideoFrameCallback(handler);
-        };
-        video.requestVideoFrameCallback(handler);
-        setTimeout(() => {
-          finished = true;
-          resolve();
-        }, 3000);
-      });
-
-      await video.play();
-      await samplePromise;
-      if (wasPaused) video.pause();
-      video.muted = originalMuted;
-      video.currentTime = originalTime;
-      setTimeout(syncCurrentFrame, 80);
-
-      if (samples.length < 2) {
-        setFpsStatus('fpsを十分に推定できませんでした。fpsを手入力してください。');
-        return;
-      }
-      const first = samples[0];
-      const last = samples[samples.length - 1];
-      const frameDelta = last.presentedFrames - first.presentedFrames;
-      const timeDelta = last.mediaTime - first.mediaTime;
-      const estimated = normalizeFps(frameDelta / timeDelta);
-      if (Number.isFinite(estimated) && estimated > 0) {
-        applyFpsToAllRows(estimated);
-        setFpsStatus(`動画フレームから ${estimated} fps と推定しました。ずれる場合はfps欄を手入力で修正してください。`);
-      } else {
-        setFpsStatus('fpsを推定できませんでした。fpsを手入力してください。');
-      }
-    } catch (error) {
-      video.muted = originalMuted;
-      if (wasPaused) video.pause();
-      setFpsStatus('自動推定が再生制限などで完了しませんでした。必要に応じて「動画からfps再推定」を押すか、fpsを手入力してください。');
+    const elementFps = normalizeFps(detectFpsFromVideoElement(video));
+    if (Number.isFinite(elementFps)) {
+      applyFpsToAllRows(elementFps);
+      setFpsStatus(`ブラウザが取得できる動画情報から ${elementFps} fps と推定しました。高fps動画では実際の撮影fpsと異なる場合があるため、撮影設定を確認してください。`);
+      return;
     }
+
+    setFpsStatus('このブラウザでは動画ファイルの真のfpsを直接取得できませんでした。撮影時のfpsを手入力するか、120/240/300fpsなどのプリセットを選んでください。');
   };
 
   const handleLoadedMetadata = () => {
@@ -488,10 +444,18 @@ export default function App() {
 
   const seekFrame = (delta) => {
     const video = videoRef.current;
-    if (!video || !(selectedCalc.fps > 0)) return;
+    const fps = selectedCalc.fps;
+    if (!video || !(fps > 0)) return;
     video.pause();
-    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + delta / selectedCalc.fps));
-    setTimeout(syncCurrentFrame, 20);
+    const maxFrame = Number.isFinite(video.duration) && video.duration > 0 ? Math.floor(video.duration * fps) : Infinity;
+    const displayedFrame = Number.parseInt(currentFrame, 10);
+    const baseFrame = Number.isFinite(displayedFrame) ? displayedFrame : Math.round((video.currentTime || 0) * fps);
+    const targetFrame = Math.max(0, Math.min(maxFrame, baseFrame + delta));
+    const targetTime = targetFrame / fps;
+    setCurrentFrame(String(targetFrame));
+    setVideoCurrentTime(targetTime);
+    video.currentTime = targetTime;
+    window.requestAnimationFrame(() => syncCurrentFrame());
   };
 
   const seekToTime = (time) => {
@@ -544,8 +508,6 @@ export default function App() {
           <p className="lead">0–10mの通過フレームと4歩分の接地・離地フレームから、最高速度、100m予想タイム、最高速度時ピッチ、最高速度時ストライドを算出します。</p>
         </div>
         <div className="heroActions">
-          <button className="primary" onClick={addRow}>＋ 試技を追加</button>
-          <button className="secondary" onClick={() => downloadCsv(rows)}>CSV出力</button>
           <button className="ghost" onClick={reset}>リセット</button>
         </div>
       </header>
@@ -601,40 +563,13 @@ export default function App() {
               controls
               onTimeUpdate={syncCurrentFrame}
               onSeeked={syncCurrentFrame}
+              onLoadedData={syncCurrentFrame}
+              onCanPlay={syncCurrentFrame}
               onLoadedMetadata={handleLoadedMetadata}
             />
           ) : (
             <div className="videoPlaceholder">動画を選択してください</div>
           )}
-        </div>
-
-        <div className="scrubber">
-          <div className="scrubberMeta">
-            <span>{formatTime(videoCurrentTime)}</span>
-            <span>{currentFrame ? `現在フレーム ${currentFrame}` : '現在フレーム —'}</span>
-            <span>{formatTime(videoDuration)}</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max={videoDuration || 0}
-            step={selectedCalc.fps > 0 ? 1 / selectedCalc.fps : 0.001}
-            value={Math.min(videoCurrentTime, videoDuration || 0)}
-            onChange={(e) => seekToTime(Number(e.target.value))}
-            disabled={!videoUrl || !videoDuration}
-          />
-        </div>
-
-        <div className="formGrid fpsGrid">
-          <Field label="フレームレート">
-            <div className="withUnit"><input inputMode="decimal" value={selectedRow?.fps || ''} onChange={(e) => updateRow(selectedRow.id, 'fps', e.target.value)} /><span>fps</span></div>
-          </Field>
-          <Field label="現在の推定フレーム">
-            <input value={currentFrame} readOnly placeholder="—" />
-          </Field>
-          <div className="field alignEnd">
-            <button className="secondary" onClick={estimateFpsFromVideo} disabled={!videoUrl}>動画からfps再推定</button>
-          </div>
         </div>
 
         <div className="registerPanel">
@@ -662,6 +597,43 @@ export default function App() {
             <span>登録順：0m通過 → 接地・離地4歩分 → 10m通過</span>
           </div>
         </div>
+
+        <div className="scrubber">
+          <div className="scrubberMeta">
+            <span>{formatTime(videoCurrentTime)}</span>
+            <span>{currentFrame ? `現在フレーム ${currentFrame}` : '現在フレーム —'}</span>
+            <span>{formatTime(videoDuration)}</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max={videoDuration || 0}
+            step={selectedCalc.fps > 0 ? 1 / selectedCalc.fps : 0.001}
+            value={Math.min(videoCurrentTime, videoDuration || 0)}
+            onChange={(e) => seekToTime(Number(e.target.value))}
+            disabled={!videoUrl || !videoDuration}
+          />
+        </div>
+
+        <div className="formGrid fpsGrid">
+          <Field label="フレームレート">
+            <div className="withUnit"><input inputMode="decimal" value={selectedRow?.fps || ''} onChange={(e) => updateRow(selectedRow.id, 'fps', e.target.value)} /><span>fps</span></div>
+          </Field>
+          <Field label="現在の推定フレーム">
+            <input value={currentFrame} readOnly placeholder="—" />
+          </Field>
+          <div className="field alignEnd">
+            <button className="secondary" onClick={estimateFpsFromVideo} disabled={!videoUrl}>fpsを確認</button>
+          </div>
+        </div>
+        <div className="fpsPresetRow">
+          <span>プリセット：</span>
+          <button className="chipButton" onClick={() => setFpsPreset(120)}>120fps</button>
+          <button className="chipButton" onClick={() => setFpsPreset(240)}>240fps</button>
+          <button className="chipButton" onClick={() => setFpsPreset(300)}>300fps</button>
+          <button className="chipButton" onClick={() => setFpsPreset(480)}>480fps</button>
+        </div>
+
       </section>
 
       <section className="card">
@@ -743,9 +715,12 @@ export default function App() {
         <div className="sectionHeader tableHeader">
           <div>
             <h2>過去の結果の一覧</h2>
-            <p className="hint">入力済みの試技を一覧表示します。CSV出力も可能です。</p>
+            <p className="hint">入力済みの試技を一覧表示します。試技の追加とCSV出力はここから行います。</p>
           </div>
-          <button className="secondary" onClick={() => downloadCsv(rows)}>CSV出力</button>
+          <div className="tableActions">
+            <button className="primary" onClick={addRow}>＋ 試技を追加</button>
+            <button className="secondary" onClick={() => downloadCsv(rows)}>CSV出力</button>
+          </div>
         </div>
         <div className="tableWrap">
           <table>

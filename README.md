@@ -1,24 +1,24 @@
 # Top Speed Sprint Analyzer
 
-動画フレームから10m区間の最高速度、100m予想タイム、最高速度時ピッチ、最高速度時ストライドを算出するWebアプリです。
+動画フレームから10m区間の最高速度、100m予想タイム、最高速度時ピッチ、最高速度時ストライドを算出するVite + Reactアプリです。
 
-## Vercel設定
-
-- Framework Preset: Vite
-- Root Directory: 空欄（リポジトリ直下）
-- Install Command: npm install
-- Build Command: npm run build
-- Output Directory: dist
-
-## ローカル確認
+## 使い方
 
 ```bash
 npm install
 npm run dev
-npm run build
 ```
+
+## Vercel設定
+
+- Framework Preset: Vite
+- Install Command: npm install
+- Build Command: npm run build
+- Output Directory: dist
+- Root Directory: 空欄（リポジトリ直下にこのファイル一式を配置）
 
 ## 注意
 
-動画ファイルはブラウザ内で読み込まれるだけで、サーバーにはアップロードされません。
-正確なコマ判定のため、120fps以上のスロー動画を推奨します。
+動画ファイルはブラウザ内でのみ読み込まれ、サーバーにはアップロードされません。
+ブラウザだけでは動画ファイルの真のfpsを取得できない場合があります。撮影時のfpsを確認し、手入力またはプリセットで補正してください。
+精度確保のため、120fps以上のスロー動画を推奨します。
