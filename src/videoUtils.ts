@@ -18,7 +18,6 @@ export async function seekVideo(video: HTMLVideoElement, time: number): Promise<
       resolved = true
       video.removeEventListener('seeked', onSeeked)
       window.clearTimeout(timeoutId)
-      // 描画タイミングを安定させる
       requestAnimationFrame(() => resolve())
     }
     const onSeeked = () => finish()
@@ -89,7 +88,6 @@ export async function captureSequenceFrames(
   return images
 }
 
-
 export type FpsEstimateResult = {
   fps: number
   rawFps: number
@@ -126,14 +124,11 @@ export function snapToCommonFps(rawFps: number): number {
       bestDiff = diff
     }
   }
-  // 代表的なFPSに近い場合は丸める。離れている場合は生値を小数2桁で返す。
-  if (bestDiff <= Math.max(0.6, best * 0.015)) return best
+  if (bestDiff <= Math.max(0.2, best * 0.008)) return best
   return Math.round(rawFps * 100) / 100
 }
 
-export function getFpsPresetFromDuration(duration: number): number {
-  if (!Number.isFinite(duration) || duration <= 0) return 120
-  // トップスピード測定は120/240fps撮影が多いので、初期値は120fpsに寄せる。
+export function getFpsPresetFromDuration(_duration: number): number {
   return 120
 }
 
@@ -163,7 +158,7 @@ export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSec
   const firstCounter = getPlaybackFrameCount(v)
   const firstMediaTime = video.currentTime
 
-  let rafHandle: number | null = null
+  let callbackHandle: number | null = null
   let samples = 0
   let firstRvfcFrames: number | null = null
   let lastRvfcFrames: number | null = null
@@ -192,9 +187,9 @@ export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSec
         resolve()
         return
       }
-      rafHandle = v.requestVideoFrameCallback?.(onFrame) ?? null
+      callbackHandle = v.requestVideoFrameCallback?.(onFrame) ?? null
     }
-    rafHandle = v.requestVideoFrameCallback(onFrame)
+    callbackHandle = v.requestVideoFrameCallback(onFrame)
   })
 
   try {
@@ -205,8 +200,8 @@ export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSec
     ])
   } finally {
     video.pause()
-    if (rafHandle !== null && typeof v.cancelVideoFrameCallback === 'function') {
-      v.cancelVideoFrameCallback(rafHandle)
+    if (callbackHandle !== null && typeof v.cancelVideoFrameCallback === 'function') {
+      v.cancelVideoFrameCallback(callbackHandle)
     }
   }
 
@@ -245,6 +240,153 @@ export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSec
   }
 }
 
+function readType(view: DataView, offset: number): string {
+  return String.fromCharCode(
+    view.getUint8(offset),
+    view.getUint8(offset + 1),
+    view.getUint8(offset + 2),
+    view.getUint8(offset + 3),
+  )
+}
+
+function toNumber(big: bigint): number {
+  const num = Number(big)
+  if (!Number.isFinite(num)) throw new Error('MP4 box size が大きすぎます。')
+  return num
+}
+
+type TrackInfo = {
+  isVideo: boolean
+  timescale: number | null
+  totalSamples: number
+  totalDeltas: number
+}
+
+const CONTAINER_TYPES = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts', 'dinf', 'udta'])
+
+function parseTrackBoxes(view: DataView, start: number, end: number, track: TrackInfo): void {
+  let offset = start
+  while (offset + 8 <= end) {
+    let size = view.getUint32(offset)
+    const type = readType(view, offset + 4)
+    let header = 8
+
+    if (size === 1) {
+      if (offset + 16 > end) break
+      size = toNumber(view.getBigUint64(offset + 8))
+      header = 16
+    } else if (size === 0) {
+      size = end - offset
+    }
+
+    if (size < header) break
+    const boxEnd = Math.min(end, offset + size)
+    const payloadStart = offset + header
+
+    if (type === 'hdlr' && payloadStart + 12 <= boxEnd) {
+      const handler = readType(view, payloadStart + 8)
+      if (handler === 'vide') track.isVideo = true
+    } else if (type === 'mdhd') {
+      const version = view.getUint8(payloadStart)
+      if (version === 1 && payloadStart + 24 <= boxEnd) {
+        track.timescale = view.getUint32(payloadStart + 20)
+      } else if (version === 0 && payloadStart + 16 <= boxEnd) {
+        track.timescale = view.getUint32(payloadStart + 12)
+      }
+    } else if (type === 'stts' && payloadStart + 8 <= boxEnd) {
+      const entryCount = view.getUint32(payloadStart + 4)
+      let entryOffset = payloadStart + 8
+      let totalSamples = 0
+      let totalDeltas = 0
+      for (let i = 0; i < entryCount && entryOffset + 8 <= boxEnd; i += 1) {
+        const sampleCount = view.getUint32(entryOffset)
+        const sampleDelta = view.getUint32(entryOffset + 4)
+        totalSamples += sampleCount
+        totalDeltas += sampleCount * sampleDelta
+        entryOffset += 8
+      }
+      track.totalSamples += totalSamples
+      track.totalDeltas += totalDeltas
+    } else if (CONTAINER_TYPES.has(type)) {
+      parseTrackBoxes(view, payloadStart, boxEnd, track)
+    }
+
+    offset = boxEnd
+  }
+}
+
+export async function extractFpsFromVideoFile(file: File): Promise<FpsEstimateResult> {
+  const fileType = file.type.toLowerCase()
+  const fileName = file.name.toLowerCase()
+  const isMp4Like = fileType.includes('mp4') || fileType.includes('quicktime') || fileName.endsWith('.mp4') || fileName.endsWith('.mov') || fileName.endsWith('.m4v')
+  if (!isMp4Like) {
+    throw new Error('この動画形式ではファイルメタデータからFPSを取得できませんでした。必要に応じて手動入力してください。')
+  }
+
+  const buffer = await file.arrayBuffer()
+  const view = new DataView(buffer)
+  const tracks: TrackInfo[] = []
+
+  let offset = 0
+  while (offset + 8 <= view.byteLength) {
+    let size = view.getUint32(offset)
+    const type = readType(view, offset + 4)
+    let header = 8
+    if (size === 1) {
+      if (offset + 16 > view.byteLength) break
+      size = toNumber(view.getBigUint64(offset + 8))
+      header = 16
+    } else if (size === 0) {
+      size = view.byteLength - offset
+    }
+    if (size < header) break
+    const boxEnd = Math.min(view.byteLength, offset + size)
+    if (type === 'moov') {
+      let inner = offset + header
+      while (inner + 8 <= boxEnd) {
+        let innerSize = view.getUint32(inner)
+        const innerType = readType(view, inner + 4)
+        let innerHeader = 8
+        if (innerSize === 1) {
+          if (inner + 16 > boxEnd) break
+          innerSize = toNumber(view.getBigUint64(inner + 8))
+          innerHeader = 16
+        } else if (innerSize === 0) {
+          innerSize = boxEnd - inner
+        }
+        if (innerSize < innerHeader) break
+        const innerEnd = Math.min(boxEnd, inner + innerSize)
+        if (innerType === 'trak') {
+          const track: TrackInfo = { isVideo: false, timescale: null, totalSamples: 0, totalDeltas: 0 }
+          parseTrackBoxes(view, inner + innerHeader, innerEnd, track)
+          if (track.isVideo && track.timescale && track.totalSamples > 0 && track.totalDeltas > 0) {
+            tracks.push(track)
+          }
+        }
+        inner = innerEnd
+      }
+    }
+    offset = boxEnd
+  }
+
+  if (tracks.length === 0) {
+    throw new Error('動画ファイルのメタデータからFPSを取得できませんでした。必要に応じて手動入力してください。')
+  }
+
+  const bestTrack = tracks.sort((a, b) => b.totalSamples - a.totalSamples)[0]
+  const rawFps = (bestTrack.timescale! * bestTrack.totalSamples) / bestTrack.totalDeltas
+  if (!Number.isFinite(rawFps) || rawFps <= 0) {
+    throw new Error('FPS計算に必要なメタデータが不足しています。')
+  }
+
+  return {
+    fps: snapToCommonFps(rawFps),
+    rawFps: Math.round(rawFps * 100) / 100,
+    samples: bestTrack.totalSamples,
+    method: 'file metadata (mp4/mov)',
+  }
+}
+
 export function downloadDataUrl(dataUrl: string, filename: string): void {
   const a = document.createElement('a')
   a.href = dataUrl
@@ -252,6 +394,52 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+}
+
+export async function createSequenceStripImage(params: {
+  sequenceImages: SequenceImage[]
+  direction: 'ltr' | 'rtl'
+  targetHeight?: number
+  gap?: number
+  background?: string
+}): Promise<string> {
+  const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
+  const targetHeight = params.targetHeight ?? 320
+  const gap = params.gap ?? 12
+  const background = params.background ?? '#ffffff'
+
+  if (images.length === 0) throw new Error('合成する連続写真がありません。')
+
+  const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
+  const widths = loaded.map((img, index) => {
+    const meta = images[index]
+    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+    const right = Math.round((meta.cropRightPercent / 100) * img.width)
+    const sw = Math.max(1, img.width - sx - right)
+    return Math.round(targetHeight * (sw / img.height))
+  })
+
+  const width = widths.reduce((sum, w) => sum + w, 0) + gap * (images.length - 1)
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = targetHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvasを初期化できませんでした。')
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  let x = 0
+  for (let i = 0; i < images.length; i += 1) {
+    const img = loaded[i]
+    const meta = images[i]
+    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+    const right = Math.round((meta.cropRightPercent / 100) * img.width)
+    const sw = Math.max(1, img.width - sx - right)
+    ctx.drawImage(img, sx, 0, sw, img.height, x, 0, widths[i], targetHeight)
+    x += widths[i] + gap
+  }
+
+  return canvas.toDataURL('image/png')
 }
 
 export async function createResultImage(params: {

@@ -2,7 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles.css'
 import { calculateSprintResult, createEmptyFrameSelection, validateFrames } from './calculator'
 import type { AthleteInfo, Direction, FirstStepFoot, FrameKey, FrameStep, SequenceImage, Sex, SprintResult } from './types'
-import { captureCurrentFrame, captureFrameAt, captureSequenceFrames, clamp, createResultImage, downloadDataUrl, estimateFpsFromPlayback, formatNumber, getFpsPresetFromDuration, seekVideo } from './videoUtils'
+import {
+  captureCurrentFrame,
+  captureFrameAt,
+  captureSequenceFrames,
+  clamp,
+  createResultImage,
+  createSequenceStripImage,
+  downloadDataUrl,
+  estimateFpsFromPlayback,
+  extractFpsFromVideoFile,
+  formatNumber,
+  getFpsPresetFromDuration,
+  seekVideo,
+} from './videoUtils'
 
 const FRAME_STEPS: FrameStep[] = [
   { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
@@ -18,13 +31,10 @@ const FRAME_STEPS: FrameStep[] = [
   { key: 'marker2', label: 'マーカー2、すなわちゴール地点を通過する瞬間を選択してください', shortLabel: 'ゴール通過' },
 ]
 
-function getFrameLabel(key: FrameKey): string {
-  return FRAME_STEPS.find((step) => step.key === key)?.shortLabel ?? key
-}
-
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
+
   const [athlete, setAthlete] = useState<AthleteInfo>({ name: '', heightCm: 170, sex: 'male' })
   const [distanceM, setDistanceM] = useState(10)
   const [fps, setFps] = useState(120)
@@ -32,6 +42,7 @@ function App() {
   const [fpsEstimateInfo, setFpsEstimateInfo] = useState('')
   const [duration, setDuration] = useState(0)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoName, setVideoName] = useState('')
   const [currentFrame, setCurrentFrame] = useState(0)
   const [frames, setFrames] = useState(createEmptyFrameSelection())
@@ -41,6 +52,8 @@ function App() {
   const [result, setResult] = useState<SprintResult | null>(null)
   const [sequenceImages, setSequenceImages] = useState<SequenceImage[]>([])
   const [direction, setDirection] = useState<Direction>('ltr')
+  const [trimIndex, setTrimIndex] = useState(0)
+  const [sequenceStripUrl, setSequenceStripUrl] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [isWorking, setIsWorking] = useState(false)
 
@@ -48,6 +61,9 @@ function App() {
   const currentStep = FRAME_STEPS[stepIndex]
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
+  const orderedImages = useMemo(() => (direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages), [direction, sequenceImages])
+  const currentTrimImage = sequenceImages[trimIndex] ?? null
+  const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
 
   useEffect(() => {
     return () => {
@@ -59,21 +75,43 @@ function App() {
     setAthlete((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleVideoChange = (file: File | null) => {
-    if (!file) return
-    if (videoUrl) URL.revokeObjectURL(videoUrl)
-    const url = URL.createObjectURL(file)
-    setVideoUrl(url)
-    setVideoName(file.name)
-    setCurrentFrame(0)
-    setEstimatedFps(null)
-    setFpsEstimateInfo('')
+  const resetAnalysisState = () => {
     setFrames(createEmptyFrameSelection())
     setStepIndex(0)
     setTd1Image(null)
     setResult(null)
     setSequenceImages([])
-    setMessage('動画を読み込みました。FPSを確認し、必要に応じて手動修正してください。')
+    setSequenceStripUrl(null)
+    setTrimIndex(0)
+  }
+
+  const handleVideoChange = async (file: File | null) => {
+    if (!file) return
+    if (videoUrl) URL.revokeObjectURL(videoUrl)
+    const url = URL.createObjectURL(file)
+    setVideoUrl(url)
+    setVideoFile(file)
+    setVideoName(file.name)
+    setCurrentFrame(0)
+    setEstimatedFps(null)
+    setFpsEstimateInfo('動画を読み込みました。動画ファイルのメタデータからFPSを確認しています。')
+    resetAnalysisState()
+    setMessage('動画を読み込みました。FPSを確認してください。')
+    setIsWorking(true)
+    try {
+      const metadataResult = await extractFpsFromVideoFile(file)
+      setEstimatedFps(metadataResult.fps)
+      setFps(metadataResult.fps)
+      setFpsEstimateInfo(`動画ファイルの情報から推定FPS：${formatNumber(metadataResult.fps, 2)} fps（生値 ${formatNumber(metadataResult.rawFps, 2)} / ${metadataResult.method}）`)
+      setMessage('動画ファイルのメタデータからFPSを取得しました。必要に応じて手動修正してください。')
+    } catch (error) {
+      const fallback = getFpsPresetFromDuration(0)
+      setFps(fallback)
+      setFpsEstimateInfo('動画ファイルのメタデータからFPSを取得できませんでした。必要に応じて「FPSを推定」または手入力してください。')
+      setMessage(error instanceof Error ? error.message : 'FPSのメタデータ取得に失敗しました。')
+    } finally {
+      setIsWorking(false)
+    }
   }
 
   const seekToFrame = async (frame: number) => {
@@ -101,7 +139,8 @@ function App() {
     setCurrentFrame(Math.max(0, Math.round(currentTime * nextFps)))
     setResult(null)
     setSequenceImages([])
-    setFpsEstimateInfo('FPSを変更しました。登録済みフレームがある場合は、必要に応じて再確認してください。')
+    setSequenceStripUrl(null)
+    setTrimIndex(0)
   }
 
   const estimateFps = async () => {
@@ -112,13 +151,13 @@ function App() {
     setIsWorking(true)
     setMessage('FPSを推定しています。短時間だけ動画を再生してフレーム情報を確認します。')
     try {
-      const result = await estimateFpsFromPlayback(videoRef.current)
-      setEstimatedFps(result.fps)
-      handleFpsChange(result.fps)
-      setFpsEstimateInfo(`推定FPS：${formatNumber(result.fps, 2)} fps（生値 ${formatNumber(result.rawFps, 2)} / ${result.method}）`)
-      setMessage('FPS推定が完了しました。撮影設定が120fpsまたは240fpsの場合は、念のため値を確認してください。')
+      const playbackResult = await estimateFpsFromPlayback(videoRef.current)
+      setEstimatedFps(playbackResult.fps)
+      setFps(playbackResult.fps)
+      setFpsEstimateInfo(`再生解析から推定FPS：${formatNumber(playbackResult.fps, 2)} fps（生値 ${formatNumber(playbackResult.rawFps, 2)} / ${playbackResult.method}）`)
+      setMessage('FPS推定が完了しました。')
     } catch (error) {
-      setFpsEstimateInfo('自動推定できませんでした。撮影設定に合わせて120または240などを手動入力してください。')
+      setFpsEstimateInfo('自動推定できませんでした。撮影設定に合わせて59.94、120、119.88、240などを手入力してください。')
       setMessage(error instanceof Error ? error.message : 'FPSを推定できませんでした。')
     } finally {
       setIsWorking(false)
@@ -134,28 +173,32 @@ function App() {
       setMessage('すべてのフレームは登録済みです。')
       return
     }
-
     setFrames((prev) => ({ ...prev, [currentStep.key]: currentFrame }))
     if (currentStep.key === 'td1' && videoRef.current) {
       try {
         setTd1Image(captureCurrentFrame(videoRef.current))
       } catch {
-        // 画像取得失敗時もフレーム登録は継続する
+        // ignore
       }
     }
     setMessage(`${currentStep.shortLabel}：${currentFrame}フレームを登録しました。`)
     setResult(null)
     setSequenceImages([])
+    setSequenceStripUrl(null)
+    setTrimIndex(0)
     setStepIndex((prev) => Math.min(prev + 1, FRAME_STEPS.length))
   }
 
   const undoRegistration = () => {
+    if (stepIndex === 0) return
     const previousIndex = Math.max(0, stepIndex - 1)
     const previousStep = FRAME_STEPS[previousIndex]
     setFrames((prev) => ({ ...prev, [previousStep.key]: null }))
     setStepIndex(previousIndex)
     setResult(null)
     setSequenceImages([])
+    setSequenceStripUrl(null)
+    setTrimIndex(0)
     setMessage(`${previousStep.shortLabel}の登録を取り消しました。`)
   }
 
@@ -208,8 +251,11 @@ function App() {
     setIsWorking(true)
     setMessage('連続写真を作成しています。')
     try {
-      setSequenceImages(await captureSequenceFrames(videoUrl, items, fps))
-      setMessage('連続写真を作成しました。必要に応じて横方向だけトリミングしてください。')
+      const images = await captureSequenceFrames(videoUrl, items, fps)
+      setSequenceImages(images)
+      setTrimIndex(0)
+      setSequenceStripUrl(null)
+      setMessage('連続写真を作成しました。1枚ずつ左右のトリミング率を設定してください。')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '連続写真を作成できませんでした。')
     } finally {
@@ -218,6 +264,7 @@ function App() {
   }
 
   const updateCrop = (id: string, key: 'cropLeftPercent' | 'cropRightPercent', value: number) => {
+    setSequenceStripUrl(null)
     setSequenceImages((prev) =>
       prev.map((image) => {
         if (image.id !== id) return image
@@ -230,6 +277,24 @@ function App() {
         return next
       }),
     )
+  }
+
+  const assembleSequence = async () => {
+    if (sequenceImages.length === 0) {
+      setMessage('先に連続写真を作成してください。')
+      return
+    }
+    setIsWorking(true)
+    setMessage('トリミング後の連続写真を合成しています。')
+    try {
+      const dataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320 })
+      setSequenceStripUrl(dataUrl)
+      setMessage('連続写真を合成しました。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '連続写真を合成できませんでした。')
+    } finally {
+      setIsWorking(false)
+    }
   }
 
   const saveResultImage = async () => {
@@ -246,7 +311,7 @@ function App() {
       const dataUrl = await createResultImage({
         athleteName: athlete.name,
         heightCm: athlete.heightCm,
-        sexLabel: athlete.sex === 'male' ? '男性' : '女性',
+        sexLabel,
         distanceM,
         splitTime: result.splitTime,
         topSpeed: result.topSpeed,
@@ -261,7 +326,7 @@ function App() {
         direction,
       })
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
-      setMessage('結果画像を保存しました。')
+      setMessage('結果シート画像を保存しました。')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '結果画像を保存できませんでした。')
     } finally {
@@ -269,26 +334,23 @@ function App() {
     }
   }
 
-  const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
-  const orderedImages = direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages
-
   return (
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p className="eyebrow">Sprint field tool</p>
-          <h1>Top Speed Analyzer</h1>
+          <p className="eyebrow">Top Speed Analyzer</p>
+          <h1>トップスピード分析</h1>
           <p className="hero-copy">
-            動画をサーバーに送信せず、ブラウザ内でフレーム登録・トップスピード・ピッチ・ストライドを計算します。
+            動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。
           </p>
         </div>
         <div className="hero-badge">
-          <span>Web MVP</span>
-          <strong>Vite + React</strong>
+          <span>Browser only</span>
+          <strong>No server upload</strong>
         </div>
       </section>
 
-      {message && <div className="notice">{message}</div>}
+      {message && <div className={`notice ${isWorking ? 'working' : ''}`}>{message}</div>}
       {isWorking && <div className="notice working">処理中です...</div>}
 
       <section className="grid two">
@@ -301,13 +363,7 @@ function App() {
             </label>
             <label>
               身長 cm
-              <input
-                type="number"
-                value={athlete.heightCm}
-                onChange={(e) => updateAthlete('heightCm', Number(e.target.value))}
-                min={100}
-                max={230}
-              />
+              <input type="number" value={athlete.heightCm} onChange={(e) => updateAthlete('heightCm', Number(e.target.value))} min={100} max={230} />
             </label>
             <label>
               性別
@@ -330,7 +386,7 @@ function App() {
         <div className="card">
           <h2>2. 動画アップロード</h2>
           <label className="file-picker">
-            <input type="file" accept="video/*" onChange={(e) => handleVideoChange(e.target.files?.[0] ?? null)} />
+            <input type="file" accept="video/*" onChange={(e) => void handleVideoChange(e.target.files?.[0] ?? null)} />
             <span>動画を選択</span>
           </label>
           {videoName && <p className="muted">選択中：{videoName}</p>}
@@ -345,6 +401,7 @@ function App() {
             </label>
           </div>
           <div className="buttons fps-buttons">
+            <button type="button" onClick={() => handleFpsChange(59.94)} disabled={!videoUrl}>59.94fpsにする</button>
             <button type="button" onClick={() => handleFpsChange(120)} disabled={!videoUrl}>120fpsにする</button>
             <button type="button" onClick={() => handleFpsChange(240)} disabled={!videoUrl}>240fpsにする</button>
             <button type="button" className="primary" onClick={estimateFps} disabled={!videoUrl || isWorking}>FPSを推定</button>
@@ -353,7 +410,7 @@ function App() {
             <p className="fps-estimate">{fpsEstimateInfo || `推定FPS：${formatNumber(estimatedFps ?? fps, 2)} fps`}</p>
           )}
           <p className="small-note">
-            コマ送りは「現在フレーム番号」を基準にして、1/fps秒ずつ移動します。iPhone動画は可変フレームレートの可能性があるため、推定後も撮影設定が120fpsなら120、240fpsなら240に合わせてください。
+            まず動画ファイルのメタデータからFPS取得を試みます。MP4/MOVでは59.94fpsや119.88fpsが取得できることがあります。取得できない場合は再生解析または手動入力を使ってください。
           </p>
         </div>
       </section>
@@ -373,19 +430,19 @@ function App() {
               <video
                 ref={videoRef}
                 src={videoUrl}
-                controls
                 playsInline
                 preload="metadata"
+                muted
+                disablePictureInPicture
+                controlsList="nodownload noplaybackrate nofullscreen"
                 onLoadedMetadata={(e) => {
                   const video = e.currentTarget
-                  const nextDuration = video.duration || 0
-                  setDuration(nextDuration)
-                  const presetFps = getFpsPresetFromDuration(nextDuration)
-                  setFps(presetFps)
-                  setCurrentFrame(0)
-                  setEstimatedFps(null)
-                  setFpsEstimateInfo('動画を読み込みました。必要に応じて「FPSを推定」または120/240fpsボタンを使ってください。')
+                  setDuration(video.duration || 0)
                   video.pause()
+                  if (!estimatedFps && !videoFile) {
+                    const presetFps = getFpsPresetFromDuration(video.duration || 0)
+                    setFps(presetFps)
+                  }
                 }}
                 onSeeked={(e) => syncFrameFromVideoTime(e.currentTarget)}
                 onTimeUpdate={(e) => syncFrameFromVideoTime(e.currentTarget)}
@@ -405,10 +462,10 @@ function App() {
               <span>現在時刻：{formatNumber(currentFrame / fps, 3)} s</span>
             </div>
             <div className="buttons frame-buttons">
-              <button type="button" onClick={() => moveFrame(-10)} disabled={!videoUrl}>-10コマ</button>
-              <button type="button" onClick={() => moveFrame(-1)} disabled={!videoUrl}>-1コマ</button>
-              <button type="button" onClick={() => moveFrame(1)} disabled={!videoUrl}>+1コマ</button>
-              <button type="button" onClick={() => moveFrame(10)} disabled={!videoUrl}>+10コマ</button>
+              <button type="button" onClick={() => void moveFrame(-10)} disabled={!videoUrl}>-10コマ</button>
+              <button type="button" onClick={() => void moveFrame(-1)} disabled={!videoUrl}>-1コマ</button>
+              <button type="button" onClick={() => void moveFrame(1)} disabled={!videoUrl}>+1コマ</button>
+              <button type="button" onClick={() => void moveFrame(10)} disabled={!videoUrl}>+10コマ</button>
             </div>
             <div className="buttons">
               <button type="button" className="primary" onClick={registerCurrentFrame} disabled={!videoUrl || !currentStep}>現在コマを登録</button>
@@ -416,12 +473,7 @@ function App() {
             </div>
             <label>
               フレーム番号を直接指定
-              <input
-                type="number"
-                value={currentFrame}
-                onChange={(e) => seekToFrame(Number(e.target.value))}
-                disabled={!videoUrl}
-              />
+              <input type="number" value={currentFrame} onChange={(e) => void seekToFrame(Number(e.target.value))} disabled={!videoUrl} />
             </label>
           </div>
         </div>
@@ -432,7 +484,7 @@ function App() {
               key={step.key}
               className={`registered-item ${index === stepIndex ? 'active' : ''}`}
               type="button"
-              onClick={() => jumpToRegisteredFrame(step.key)}
+              onClick={() => void jumpToRegisteredFrame(step.key)}
               disabled={frames[step.key] === null}
             >
               <span>{step.shortLabel}</span>
@@ -445,16 +497,12 @@ function App() {
       <section className="grid two">
         <div className="card">
           <h2>4. 1歩目の左右選択</h2>
-          {td1Image ? (
-            <img className="foot-image" src={td1Image} alt="1歩目着地フレーム" />
-          ) : (
-            <div className="image-placeholder">1歩目着地を登録するとスクリーンショットを表示します。</div>
-          )}
+          {td1Image ? <img className="foot-image" src={td1Image} alt="1歩目着地フレーム" /> : <div className="image-placeholder">1歩目着地を登録するとスクリーンショットを表示します。</div>}
           <div className="buttons foot-buttons">
             <button type="button" className={firstStepFoot === 'right' ? 'selected' : ''} onClick={() => setFirstStepFoot('right')}>右足</button>
             <button type="button" className={firstStepFoot === 'left' ? 'selected' : ''} onClick={() => setFirstStepFoot('left')}>左足</button>
           </div>
-          <button type="button" onClick={captureTd1Again} disabled={!videoUrl || frames.td1 === null}>1歩目画像を再取得</button>
+          <button type="button" onClick={() => void captureTd1Again()} disabled={!videoUrl || frames.td1 === null}>1歩目画像を再取得</button>
         </div>
 
         <div className="card">
@@ -480,7 +528,6 @@ function App() {
               <h2>分析結果</h2>
               <p className="muted">{athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
             </div>
-            <button type="button" onClick={saveResultImage} disabled={sequenceImages.length === 0}>結果画像を保存</button>
           </div>
 
           <div className="result-grid">
@@ -510,18 +557,66 @@ function App() {
             <h2>6. 連続写真</h2>
             <p className="muted">2歩目着地〜3歩目離地のフレームから作成します。</p>
           </div>
-          <button type="button" className="primary" onClick={generateSequence} disabled={!videoUrl}>連続写真を作成</button>
+          <button type="button" className="primary" onClick={() => void generateSequence()} disabled={!videoUrl}>連続写真を作成</button>
         </div>
 
         <div className="direction-control">
           <span>並べる方向</span>
-          <button type="button" className={direction === 'ltr' ? 'selected' : ''} onClick={() => setDirection('ltr')}>左から右に並べる</button>
-          <button type="button" className={direction === 'rtl' ? 'selected' : ''} onClick={() => setDirection('rtl')}>右から左に並べる</button>
+          <button type="button" className={direction === 'ltr' ? 'selected' : ''} onClick={() => { setDirection('ltr'); setSequenceStripUrl(null) }}>左から右に並べる</button>
+          <button type="button" className={direction === 'rtl' ? 'selected' : ''} onClick={() => { setDirection('rtl'); setSequenceStripUrl(null) }}>右から左に並べる</button>
         </div>
 
         {sequenceImages.length > 0 ? (
           <>
-            <div className="sequence-row">
+            {currentTrimImage && (
+              <div className="trim-workspace">
+                <div className="trim-stage">
+                  <div className="trim-stage-header">
+                    <strong>{trimIndex + 1} / {sequenceImages.length} 枚目</strong>
+                    <span>{currentTrimImage.label} / F{currentTrimImage.frame}</span>
+                  </div>
+                  <div className="single-crop-preview">
+                    <img
+                      src={currentTrimImage.dataUrl}
+                      alt={currentTrimImage.label}
+                      style={{
+                        width: `${100 / Math.max(0.15, 1 - (currentTrimImage.cropLeftPercent + currentTrimImage.cropRightPercent) / 100)}%`,
+                        transform: `translateX(-${currentTrimImage.cropLeftPercent}%)`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="trim-controls">
+                  <label>
+                    左から何%切り取るか：{currentTrimImage.cropLeftPercent}%
+                    <input type="range" min="0" max="60" value={currentTrimImage.cropLeftPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropLeftPercent', Number(e.target.value))} />
+                  </label>
+                  <label>
+                    右から何%切り取るか：{currentTrimImage.cropRightPercent}%
+                    <input type="range" min="0" max="60" value={currentTrimImage.cropRightPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropRightPercent', Number(e.target.value))} />
+                  </label>
+                  <div className="buttons">
+                    <button type="button" onClick={() => setTrimIndex((prev) => Math.max(0, prev - 1))} disabled={trimIndex === 0}>前の写真</button>
+                    <button type="button" onClick={() => setTrimIndex((prev) => Math.min(sequenceImages.length - 1, prev + 1))} disabled={trimIndex >= sequenceImages.length - 1}>次の写真</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="buttons">
+              <button type="button" className="primary wide" onClick={() => void assembleSequence()}>すべての写真を合成</button>
+            </div>
+
+            {sequenceStripUrl ? (
+              <div className="assembled-block">
+                <img className="assembled-strip" src={sequenceStripUrl} alt="合成後の連続写真" />
+              </div>
+            ) : (
+              <div className="image-placeholder">「すべての写真を合成」を押すと、トリミング後の連続写真を横一列で表示します。</div>
+            )}
+
+            <div className="sequence-row compact-preview">
               {orderedImages.map((image) => (
                 <div className="sequence-item" key={image.id}>
                   <div className="cropped-preview">
@@ -538,26 +633,16 @@ function App() {
                 </div>
               ))}
             </div>
-
-            <div className="crop-grid">
-              {sequenceImages.map((image) => (
-                <div className="crop-card" key={image.id}>
-                  <strong>{image.label} / F{image.frame}</strong>
-                  <label>
-                    左をカット {image.cropLeftPercent}%
-                    <input type="range" min="0" max="60" value={image.cropLeftPercent} onChange={(e) => updateCrop(image.id, 'cropLeftPercent', Number(e.target.value))} />
-                  </label>
-                  <label>
-                    右をカット {image.cropRightPercent}%
-                    <input type="range" min="0" max="60" value={image.cropRightPercent} onChange={(e) => updateCrop(image.id, 'cropRightPercent', Number(e.target.value))} />
-                  </label>
-                </div>
-              ))}
-            </div>
           </>
         ) : (
           <div className="image-placeholder">連続写真はまだ作成されていません。</div>
         )}
+      </section>
+
+      <section className="card save-card">
+        <h2>7. 結果の保存</h2>
+        <p className="muted">トップスピード、ピッチ、ストライド、左右の接地時間・滞空時間、100m予測タイム、連続写真を1枚の結果シート画像として保存します。</p>
+        <button type="button" className="primary wide save-button" onClick={() => void saveResultImage()} disabled={!result || sequenceImages.length === 0}>結果の保存</button>
       </section>
 
       <section className="card small-note">
@@ -566,7 +651,7 @@ function App() {
           <li>120fps以上、可能であれば240fpsで撮影してください。</li>
           <li>カメラはマーカー区間の中央付近から、できるだけ横方向に設置してください。</li>
           <li>マーカー間距離は正確に測定してください。</li>
-          <li>FPSは動画メタデータだけに依存せず、撮影設定に合わせて手動確認してください。</li>
+          <li>MP4/MOVでは動画ファイルのメタデータからFPS取得を試みますが、取得できない場合は撮影設定を手動で入力してください。</li>
         </ul>
       </section>
     </main>
