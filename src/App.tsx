@@ -58,6 +58,36 @@ function buildSequenceItems(frames: ReturnType<typeof createEmptyFrameSelection>
   ]
 }
 
+function IconFrameControls({
+  disabled,
+  onBack10,
+  onBack1,
+  onRegister,
+  onForward1,
+  onForward10,
+  registerDisabled = false,
+  compact = false,
+}: {
+  disabled: boolean
+  onBack10?: () => void
+  onBack1?: () => void
+  onRegister?: () => void
+  onForward1?: () => void
+  onForward10?: () => void
+  registerDisabled?: boolean
+  compact?: boolean
+}) {
+  return (
+    <div className={`icon-frame-controls ${compact ? 'compact' : ''}`}>
+      <button type="button" aria-label="10コマ戻る" onClick={onBack10} disabled={disabled}>⏪<span>-10</span></button>
+      <button type="button" aria-label="1コマ戻る" onClick={onBack1} disabled={disabled}>◀<span>-1</span></button>
+      <button type="button" aria-label="現在位置を登録" className="register-icon-button" onClick={onRegister} disabled={disabled || registerDisabled}>◎<span>登録</span></button>
+      <button type="button" aria-label="1コマ進む" onClick={onForward1} disabled={disabled}>▶<span>+1</span></button>
+      <button type="button" aria-label="10コマ進む" onClick={onForward10} disabled={disabled}>⏩<span>+10</span></button>
+    </div>
+  )
+}
+
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
@@ -360,6 +390,7 @@ function App() {
         bottomCropPercent,
         sequenceStripRow1DataUrl: row1StripDataUrl,
         sequenceStripRow2DataUrl: row2StripDataUrl,
+        appUrl: window.location.origin + window.location.pathname,
       })
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
       setMessage('結果シート画像を保存しました。')
@@ -367,6 +398,29 @@ function App() {
       setMessage(error instanceof Error ? error.message : '結果画像を保存できませんでした。')
     } finally {
       setIsWorking(false)
+    }
+  }
+
+
+  const shareResult = async () => {
+    const appUrl = window.location.origin + window.location.pathname
+    const shareText = result
+      ? `トップスピード ${formatNumber(result.topSpeed, 2)} m/s、ピッチ ${formatNumber(result.pitch, 2)} step/s、ストライド ${formatNumber(result.stride, 2)} m を測定しました。
+Top Speed Analyzer：${appUrl}`
+      : `Top Speed Analyzerでトップスピードを測定できます。
+${appUrl}`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Top Speed Analyzer', text: shareText, url: appUrl })
+        setMessage('共有メニューを開きました。')
+      } else {
+        await navigator.clipboard.writeText(shareText)
+        setMessage('共有文とURLをクリップボードにコピーしました。')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      setMessage('共有できませんでした。ブラウザの共有機能またはクリップボード設定を確認してください。')
     }
   }
 
@@ -470,7 +524,7 @@ function App() {
             <div className="guide-step-card">
               <div className="mini-screen video-mini">
                 <div className="runner-dot" />
-                <div className="mini-controls">−1　＋1</div>
+                <IconFrameControls compact disabled={false} />
               </div>
               <span>2</span>
               <strong>コマを探す</strong>
@@ -520,15 +574,17 @@ function App() {
               フレーム位置を移動
               <input className="frame-slider" type="range" min="0" max={Math.max(totalFrames, 1)} step="1" value={Math.min(currentFrame, Math.max(totalFrames, 1))} onChange={(e) => void seekToFrame(Number(e.target.value))} disabled={!videoUrl} />
             </label>
-            <div className="buttons frame-buttons">
-              <button type="button" onClick={() => void moveFrame(-10)} disabled={!videoUrl}>-10コマ</button>
-              <button type="button" onClick={() => void moveFrame(-1)} disabled={!videoUrl}>-1コマ</button>
-              <button type="button" onClick={() => void moveFrame(1)} disabled={!videoUrl}>+1コマ</button>
-              <button type="button" onClick={() => void moveFrame(10)} disabled={!videoUrl}>+10コマ</button>
-            </div>
-            <div className="buttons">
-              <button type="button" className="primary" onClick={registerCurrentFrame} disabled={!videoUrl || !currentStep}>現在コマを登録</button>
-              <button type="button" onClick={undoRegistration} disabled={stepIndex === 0}>1つ前に戻る</button>
+            <IconFrameControls
+              disabled={!videoUrl}
+              registerDisabled={!currentStep}
+              onBack10={() => void moveFrame(-10)}
+              onBack1={() => void moveFrame(-1)}
+              onRegister={registerCurrentFrame}
+              onForward1={() => void moveFrame(1)}
+              onForward10={() => void moveFrame(10)}
+            />
+            <div className="buttons undo-row">
+              <button type="button" onClick={undoRegistration} disabled={stepIndex === 0}>1つ前の指示に戻る</button>
             </div>
             <label>
               フレーム番号を直接指定
@@ -696,7 +752,10 @@ function App() {
       <section className="card save-card">
         <h2>6. 結果の保存</h2>
         <p className="muted">トップスピード、ピッチ、ストライド、左右の接地時間、滞空時間、100m予測タイムと連続写真を1枚の結果シート画像として保存します。</p>
-        <button type="button" className="primary wide save-button" onClick={() => void saveResultImage()} disabled={!result || sequenceImages.length === 0}>結果の保存</button>
+        <div className="save-actions">
+          <button type="button" className="primary wide save-button" onClick={() => void saveResultImage()} disabled={!result || sequenceImages.length === 0}>結果の保存</button>
+          <button type="button" className="wide share-button" onClick={() => void shareResult()} disabled={!result}>SNSでシェア</button>
+        </div>
       </section>
     </main>
   )

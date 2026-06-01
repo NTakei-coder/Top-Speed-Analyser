@@ -1,3 +1,4 @@
+import QRCode from 'qrcode'
 import type { SequenceImage } from './types'
 
 export function clamp(value: number, min: number, max: number): number {
@@ -475,6 +476,7 @@ export async function createResultImage(params: {
   bottomCropPercent?: number
   sequenceStripRow1DataUrl?: string
   sequenceStripRow2DataUrl?: string
+  appUrl?: string
 }): Promise<string> {
   const width = 1800
   const headerHeight = 470
@@ -499,6 +501,15 @@ export async function createResultImage(params: {
   ctx.font = '400 28px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
   ctx.fillStyle = '#475569'
   ctx.fillText(`${params.athleteName || '名前未入力'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / マーカー間距離 ${formatNumber(params.distanceM, 2)} m`, 58, 124)
+
+  if (params.appUrl) {
+    const qrDataUrl = await QRCode.toDataURL(params.appUrl, { margin: 1, width: 120 })
+    const qrImage = await loadImage(qrDataUrl)
+    ctx.drawImage(qrImage, width - 168, 28, 104, 104)
+    ctx.fillStyle = '#334155'
+    ctx.font = '600 16px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('Webアプリはこちら', width - 180, 150)
+  }
 
   const metrics = [
     { label: 'トップスピード', value: `${formatNumber(params.topSpeed, 2)} m/s`, big: true },
