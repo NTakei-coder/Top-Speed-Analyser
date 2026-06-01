@@ -89,7 +89,6 @@ function App() {
   const currentStep = FRAME_STEPS[stepIndex]
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
-  const orderedImages = useMemo(() => (direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages), [direction, sequenceImages])
   const currentTrimImage = sequenceImages[trimIndex] ?? null
   const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
   const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
@@ -287,6 +286,24 @@ function App() {
     )
   }
 
+  const moveToNextTrimImage = () => {
+    if (trimIndex >= sequenceImages.length - 1) return
+    setSequenceImages((prev) => {
+      const next = [...prev]
+      const current = next[trimIndex]
+      const target = next[trimIndex + 1]
+      if (current && target) {
+        next[trimIndex + 1] = {
+          ...target,
+          cropLeftPercent: current.cropLeftPercent,
+          cropRightPercent: current.cropRightPercent,
+        }
+      }
+      return next
+    })
+    setTrimIndex((prev) => Math.min(sequenceImages.length - 1, prev + 1))
+  }
+
   const assembleSequence = async () => {
     if (sequenceImages.length === 0) {
       setMessage('必要なフレームがそろうと連続写真が自動作成されます。')
@@ -316,6 +333,8 @@ function App() {
     }
     setIsWorking(true)
     try {
+      const stripDataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent })
+      setSequenceStripUrl(stripDataUrl)
       const dataUrl = await createResultImage({
         athleteName: athlete.name,
         heightCm: athlete.heightCm,
@@ -334,6 +353,7 @@ function App() {
         direction,
         topCropPercent,
         bottomCropPercent,
+        sequenceStripDataUrl: stripDataUrl,
       })
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
       setMessage('結果シート画像を保存しました。')
@@ -561,9 +581,9 @@ function App() {
         </div>
 
         <div className="direction-control">
-          <span>並べる方向</span>
-          <button type="button" className={direction === 'ltr' ? 'selected' : ''} onClick={() => { setDirection('ltr'); setSequenceStripUrl(null) }}>左から右に並べる</button>
-          <button type="button" className={direction === 'rtl' ? 'selected' : ''} onClick={() => { setDirection('rtl'); setSequenceStripUrl(null) }}>右から左に並べる</button>
+          <span>どちらから走ってきたか</span>
+          <button type="button" className={direction === 'ltr' ? 'selected' : ''} onClick={() => { setDirection('ltr'); setSequenceStripUrl(null) }}>左から右に走っている</button>
+          <button type="button" className={direction === 'rtl' ? 'selected' : ''} onClick={() => { setDirection('rtl'); setSequenceStripUrl(null) }}>右から左に走っている</button>
         </div>
 
         {sequenceImages.length > 0 ? (
@@ -612,7 +632,7 @@ function App() {
                   {trimIndex > 0 && <p className="field-help">この写真には、1枚目で指定した上下トリミングが自動適用されます。</p>}
                   <div className="buttons">
                     <button type="button" onClick={() => setTrimIndex((prev) => Math.max(0, prev - 1))} disabled={trimIndex === 0}>前の写真</button>
-                    <button type="button" onClick={() => setTrimIndex((prev) => Math.min(sequenceImages.length - 1, prev + 1))} disabled={trimIndex >= sequenceImages.length - 1}>次の写真</button>
+                    <button type="button" onClick={moveToNextTrimImage} disabled={trimIndex >= sequenceImages.length - 1}>次の写真</button>
                   </div>
                 </div>
               </div>
@@ -629,24 +649,6 @@ function App() {
             ) : (
               <div className="image-placeholder">合成すると、写真間の余白なしで横一列に並べて表示します。</div>
             )}
-
-            <div className="sequence-row compact-preview">
-              {orderedImages.slice(0, 6).map((image) => (
-                <div className="sequence-item" key={image.id}>
-                  <div className="cropped-preview">
-                    <img
-                      src={image.dataUrl}
-                      alt={image.label}
-                      style={{
-                        width: `${100 / Math.max(0.15, 1 - (image.cropLeftPercent + image.cropRightPercent) / 100)}%`,
-                        transform: `translateX(-${image.cropLeftPercent}%)`,
-                      }}
-                    />
-                  </div>
-                  <div className="sequence-label">{image.label}</div>
-                </div>
-              ))}
-            </div>
           </>
         ) : (
           <div className="image-placeholder">2歩目着地・2歩目離地・3歩目着地・3歩目離地・4歩目着地まで登録すると、自動で17枚の写真を作成します。</div>

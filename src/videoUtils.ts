@@ -472,6 +472,7 @@ export async function createResultImage(params: {
   direction: 'ltr' | 'rtl'
   topCropPercent?: number
   bottomCropPercent?: number
+  sequenceStripDataUrl?: string
 }): Promise<string> {
   const width = 1800
   const headerHeight = 470
@@ -529,43 +530,47 @@ export async function createResultImage(params: {
     ctx.fillText(m.value, x + 22, y + 88)
   })
 
-  const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
   const availableW = width - 112
   const y = headerHeight
-  const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
-  const rawWidths = loaded.map((img, index) => {
-    const meta = images[index]
-    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
-    const right = Math.round((meta.cropRightPercent / 100) * img.width)
-    const sw = Math.max(1, img.width - sx - right)
-    const sy = Math.round((topCropPercent / 100) * img.height)
-    const bottom = Math.round((bottomCropPercent / 100) * img.height)
-    const sh = Math.max(1, img.height - sy - bottom)
-    return imageHeight * (sw / sh)
-  })
-  const rawTotalWidth = rawWidths.reduce((sum, value) => sum + value, 0)
-  const totalGap = gap * Math.max(0, images.length - 1)
-  const scale = rawTotalWidth > 0 ? Math.min(1, (availableW - totalGap) / rawTotalWidth) : 1
-  const widths = rawWidths.map((value) => Math.max(1, Math.round(value * scale)))
 
-  let currentX = 56
-  for (let i = 0; i < images.length; i += 1) {
-    const img = loaded[i]
-    const meta = images[i]
-    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
-    const right = Math.round((meta.cropRightPercent / 100) * img.width)
-    const sw = Math.max(1, img.width - sx - right)
-    const sy = Math.round((topCropPercent / 100) * img.height)
-    const bottom = Math.round((bottomCropPercent / 100) * img.height)
-    const sh = Math.max(1, img.height - sy - bottom)
-    const drawW = widths[i]
-    ctx.drawImage(img, sx, sy, sw, sh, currentX, y, drawW, imageHeight)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.72)'
-    ctx.fillRect(currentX, y + imageHeight - 44, drawW, 44)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '600 20px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(`${images[i].label} / F${images[i].frame}`, currentX + 12, y + imageHeight - 16)
-    currentX += drawW + gap
+  if (params.sequenceStripDataUrl) {
+    const stripImage = await loadImage(params.sequenceStripDataUrl)
+    const scale = Math.min(1, availableW / stripImage.width)
+    const drawW = Math.round(stripImage.width * scale)
+    const drawH = Math.round(stripImage.height * scale)
+    ctx.drawImage(stripImage, 56, y, drawW, drawH)
+  } else {
+    const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
+    const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
+    const rawWidths = loaded.map((img, index) => {
+      const meta = images[index]
+      const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+      const right = Math.round((meta.cropRightPercent / 100) * img.width)
+      const sw = Math.max(1, img.width - sx - right)
+      const sy = Math.round((topCropPercent / 100) * img.height)
+      const bottom = Math.round((bottomCropPercent / 100) * img.height)
+      const sh = Math.max(1, img.height - sy - bottom)
+      return imageHeight * (sw / sh)
+    })
+    const rawTotalWidth = rawWidths.reduce((sum, value) => sum + value, 0)
+    const totalGap = gap * Math.max(0, images.length - 1)
+    const scale = rawTotalWidth > 0 ? Math.min(1, (availableW - totalGap) / rawTotalWidth) : 1
+    const widths = rawWidths.map((value) => Math.max(1, Math.round(value * scale)))
+
+    let currentX = 56
+    for (let i = 0; i < images.length; i += 1) {
+      const img = loaded[i]
+      const meta = images[i]
+      const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+      const right = Math.round((meta.cropRightPercent / 100) * img.width)
+      const sw = Math.max(1, img.width - sx - right)
+      const sy = Math.round((topCropPercent / 100) * img.height)
+      const bottom = Math.round((bottomCropPercent / 100) * img.height)
+      const sh = Math.max(1, img.height - sy - bottom)
+      const drawW = widths[i]
+      ctx.drawImage(img, sx, sy, sw, sh, currentX, y, drawW, imageHeight)
+      currentX += drawW + gap
+    }
   }
 
   ctx.fillStyle = '#94a3b8'
