@@ -773,3 +773,82 @@ video::-webkit-media-controls-start-playback-button {
   height: auto !important;
   max-width: none !important;
 }
+
+
+.instruction {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.instruction.odd-step {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+}
+
+.instruction.even-step {
+  background: #f5f3ff;
+  border: 1px solid #c4b5fd;
+  color: #6d28d9;
+}
+
+.frame-slider-label {
+  gap: 10px;
+}
+
+.frame-slider {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.single-crop-preview {
+  overflow: auto;
+  max-height: 500px;
+}
+
+.overlay-canvas {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.overlay-image {
+  display: block;
+  max-width: 100%;
+  max-height: none;
+  height: auto;
+}
+
+.frame-overlay-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  background: rgba(100, 116, 139, 0.82);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.crop-mask {
+  z-index: 1;
+}
+
+.crop-window {
+  z-index: 2;
+}
+
+.assembled-block {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.assembled-strip {
+  max-height: none !important;
+}

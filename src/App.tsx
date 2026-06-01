@@ -38,23 +38,23 @@ function quarterFrame(start: number, end: number, ratio: number): number {
 function buildSequenceItems(frames: ReturnType<typeof createEmptyFrameSelection>) {
   if (frames.td2 === null || frames.to2 === null || frames.td3 === null || frames.to3 === null || frames.td4 === null) return null
   return [
-    { id: 'td2', label: '2歩目着地', frame: frames.td2 },
-    { id: 'td2_to2_q1', label: '2歩目接地 1/4', frame: quarterFrame(frames.td2, frames.to2, 0.25) },
-    { id: 'td2_to2_q2', label: '2歩目接地 1/2', frame: quarterFrame(frames.td2, frames.to2, 0.5) },
-    { id: 'td2_to2_q3', label: '2歩目接地 3/4', frame: quarterFrame(frames.td2, frames.to2, 0.75) },
+    { id: 'td2', label: '2歩目接地', frame: frames.td2 },
+    { id: 'td2_to2_q1', label: '2歩目接地期前半', frame: quarterFrame(frames.td2, frames.to2, 0.25) },
+    { id: 'td2_to2_q2', label: '2歩目接地期中盤', frame: quarterFrame(frames.td2, frames.to2, 0.5) },
+    { id: 'td2_to2_q3', label: '2歩目接地期後半', frame: quarterFrame(frames.td2, frames.to2, 0.75) },
     { id: 'to2', label: '2歩目離地', frame: frames.to2 },
-    { id: 'to2_td3_q1', label: '2→3歩 1/4', frame: quarterFrame(frames.to2, frames.td3, 0.25) },
-    { id: 'to2_td3_q2', label: '2→3歩 1/2', frame: quarterFrame(frames.to2, frames.td3, 0.5) },
-    { id: 'to2_td3_q3', label: '2→3歩 3/4', frame: quarterFrame(frames.to2, frames.td3, 0.75) },
-    { id: 'td3', label: '3歩目着地', frame: frames.td3 },
-    { id: 'td3_to3_q1', label: '3歩目接地 1/4', frame: quarterFrame(frames.td3, frames.to3, 0.25) },
-    { id: 'td3_to3_q2', label: '3歩目接地 1/2', frame: quarterFrame(frames.td3, frames.to3, 0.5) },
-    { id: 'td3_to3_q3', label: '3歩目接地 3/4', frame: quarterFrame(frames.td3, frames.to3, 0.75) },
+    { id: 'to2_td3_q1', label: '2-3歩滞空期前半', frame: quarterFrame(frames.to2, frames.td3, 0.25) },
+    { id: 'to2_td3_q2', label: '2-3歩滞空期中盤', frame: quarterFrame(frames.to2, frames.td3, 0.5) },
+    { id: 'to2_td3_q3', label: '2-3歩滞空期後半', frame: quarterFrame(frames.to2, frames.td3, 0.75) },
+    { id: 'td3', label: '3歩目接地', frame: frames.td3 },
+    { id: 'td3_to3_q1', label: '3歩目接地期前半', frame: quarterFrame(frames.td3, frames.to3, 0.25) },
+    { id: 'td3_to3_q2', label: '3歩目接地期中盤', frame: quarterFrame(frames.td3, frames.to3, 0.5) },
+    { id: 'td3_to3_q3', label: '3歩目接地期後半', frame: quarterFrame(frames.td3, frames.to3, 0.75) },
     { id: 'to3', label: '3歩目離地', frame: frames.to3 },
-    { id: 'to3_td4_q1', label: '3→4歩 1/4', frame: quarterFrame(frames.to3, frames.td4, 0.25) },
-    { id: 'to3_td4_q2', label: '3→4歩 1/2', frame: quarterFrame(frames.to3, frames.td4, 0.5) },
-    { id: 'to3_td4_q3', label: '3→4歩 3/4', frame: quarterFrame(frames.to3, frames.td4, 0.75) },
-    { id: 'td4', label: '4歩目着地', frame: frames.td4 },
+    { id: 'to3_td4_q1', label: '3-4歩滞空期前半', frame: quarterFrame(frames.to3, frames.td4, 0.25) },
+    { id: 'to3_td4_q2', label: '3-4歩滞空期中盤', frame: quarterFrame(frames.to3, frames.td4, 0.5) },
+    { id: 'to3_td4_q3', label: '3-4歩滞空期後半', frame: quarterFrame(frames.to3, frames.td4, 0.75) },
+    { id: 'td4', label: '4歩目接地', frame: frames.td4 },
   ]
 }
 
@@ -337,6 +337,9 @@ function App() {
     try {
       const stripDataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent })
       setSequenceStripUrl(stripDataUrl)
+      const displayImages = direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages
+      const row1StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(0, 8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent })
+      const row2StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent })
       const dataUrl = await createResultImage({
         athleteName: athlete.name,
         heightCm: athlete.heightCm,
@@ -355,7 +358,8 @@ function App() {
         direction,
         topCropPercent,
         bottomCropPercent,
-        sequenceStripDataUrl: stripDataUrl,
+        sequenceStripRow1DataUrl: row1StripDataUrl,
+        sequenceStripRow2DataUrl: row2StripDataUrl,
       })
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
       setMessage('結果シート画像を保存しました。')
@@ -476,14 +480,14 @@ function App() {
           </div>
 
           <div className="control-panel">
-            <div className="instruction">
+            <div className={`instruction ${stepIndex % 2 === 0 ? "odd-step" : "even-step"}`}>
               {currentStep ? currentStep.label : 'すべてのフレーム登録が完了しました。'}
             </div>
-            <div className="frame-meta">
-              <span>FPS：{formatNumber(fps, 2)}</span>
-              <span>総フレーム推定：{totalFrames}</span>
-              <span>現在時刻：{formatNumber(currentFrame / fps, 3)} s</span>
-            </div>
+
+            <label className="frame-slider-label">
+              フレーム位置を移動
+              <input className="frame-slider" type="range" min="0" max={Math.max(totalFrames, 1)} step="1" value={Math.min(currentFrame, Math.max(totalFrames, 1))} onChange={(e) => void seekToFrame(Number(e.target.value))} disabled={!videoUrl} />
+            </label>
             <div className="buttons frame-buttons">
               <button type="button" onClick={() => void moveFrame(-10)} disabled={!videoUrl}>-10コマ</button>
               <button type="button" onClick={() => void moveFrame(-1)} disabled={!videoUrl}>-1コマ</button>
@@ -520,6 +524,7 @@ function App() {
       <section className="grid two">
         <div className="card">
           <h2>4. 1歩目の左右選択</h2>
+          <p className="muted">この接地が左右どちらか選んでください。</p>
           {td1Image ? <img className="foot-image" src={td1Image} alt="1歩目着地フレーム" /> : <div className="image-placeholder">1歩目着地を登録するとスクリーンショットを表示します。</div>}
           <div className="buttons foot-buttons">
             <button type="button" className={firstStepFoot === 'right' ? 'selected' : ''} onClick={() => setFirstStepFoot('right')}>右足</button>
@@ -596,13 +601,16 @@ function App() {
                     <strong>{trimIndex + 1} / {sequenceImages.length} 枚目</strong>
                     <span>{currentTrimImage.label} / F{currentTrimImage.frame}</span>
                   </div>
-                  <div className="single-crop-preview overlay-preview">
-                    <img src={currentTrimImage.dataUrl} alt={currentTrimImage.label} className="overlay-image" />
-                    <div className="crop-mask left" style={{ width: `${currentTrimImage.cropLeftPercent}%` }} />
-                    <div className="crop-mask right" style={{ width: `${currentTrimImage.cropRightPercent}%` }} />
-                    <div className="crop-mask top" style={{ height: `${topCropPercent}%` }} />
-                    <div className="crop-mask bottom" style={{ height: `${bottomCropPercent}%` }} />
-                    <div className="crop-window" style={{ left: `${currentTrimImage.cropLeftPercent}%`, right: `${currentTrimImage.cropRightPercent}%`, top: `${topCropPercent}%`, bottom: `${bottomCropPercent}%` }} />
+                  <div className="single-crop-preview">
+                    <div className="overlay-canvas">
+                      <img src={currentTrimImage.dataUrl} alt={currentTrimImage.label} className="overlay-image" />
+                      <div className="frame-overlay-label">{currentTrimImage.label}</div>
+                      <div className="crop-mask left" style={{ width: `${currentTrimImage.cropLeftPercent}%` }} />
+                      <div className="crop-mask right" style={{ width: `${currentTrimImage.cropRightPercent}%` }} />
+                      <div className="crop-mask top" style={{ height: `${topCropPercent}%` }} />
+                      <div className="crop-mask bottom" style={{ height: `${bottomCropPercent}%` }} />
+                      <div className="crop-window" style={{ left: `${currentTrimImage.cropLeftPercent}%`, right: `${currentTrimImage.cropRightPercent}%`, top: `${topCropPercent}%`, bottom: `${bottomCropPercent}%` }} />
+                    </div>
                   </div>
                 </div>
 

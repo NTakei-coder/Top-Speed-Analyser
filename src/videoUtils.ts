@@ -448,6 +448,7 @@ export async function createSequenceStripImage(params: {
     const bottom = Math.round((bottomCropPercent / 100) * img.height)
     const sh = Math.max(1, img.height - sy - bottom)
     ctx.drawImage(img, sx, sy, sw, sh, x, 0, widths[i], targetHeight)
+    drawFrameLabel(ctx, x + 6, 6, meta.label)
     x += widths[i] + gap
   }
 
@@ -472,18 +473,20 @@ export async function createResultImage(params: {
   direction: 'ltr' | 'rtl'
   topCropPercent?: number
   bottomCropPercent?: number
-  sequenceStripDataUrl?: string
+  sequenceStripRow1DataUrl?: string
+  sequenceStripRow2DataUrl?: string
 }): Promise<string> {
   const width = 1800
   const headerHeight = 470
   const gap = 0
-  const imageHeight = 430
+  const imageHeight = 240
+  const rowGap = 18
   const footerHeight = 40
   const topCropPercent = params.topCropPercent ?? 0
   const bottomCropPercent = params.bottomCropPercent ?? 0
   const canvas = document.createElement('canvas')
   canvas.width = width
-  canvas.height = headerHeight + imageHeight + footerHeight
+  canvas.height = headerHeight + imageHeight * 2 + rowGap + footerHeight
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvasを初期化できませんでした。')
 
@@ -533,12 +536,17 @@ export async function createResultImage(params: {
   const availableW = width - 112
   const y = headerHeight
 
-  if (params.sequenceStripDataUrl) {
-    const stripImage = await loadImage(params.sequenceStripDataUrl)
-    const scale = Math.min(1, availableW / stripImage.width)
-    const drawW = Math.round(stripImage.width * scale)
-    const drawH = Math.round(stripImage.height * scale)
-    ctx.drawImage(stripImage, 56, y, drawW, drawH)
+  if (params.sequenceStripRow1DataUrl && params.sequenceStripRow2DataUrl) {
+    const row1 = await loadImage(params.sequenceStripRow1DataUrl)
+    const row2 = await loadImage(params.sequenceStripRow2DataUrl)
+    const scale1 = Math.min(1, availableW / row1.width)
+    const scale2 = Math.min(1, availableW / row2.width)
+    const drawW1 = Math.round(row1.width * scale1)
+    const drawH1 = Math.round(row1.height * scale1)
+    const drawW2 = Math.round(row2.width * scale2)
+    const drawH2 = Math.round(row2.height * scale2)
+    ctx.drawImage(row1, 56, y, drawW1, drawH1)
+    ctx.drawImage(row2, 56, y + imageHeight + rowGap, drawW2, drawH2)
   } else {
     const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
     const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
@@ -569,6 +577,7 @@ export async function createResultImage(params: {
       const sh = Math.max(1, img.height - sy - bottom)
       const drawW = widths[i]
       ctx.drawImage(img, sx, sy, sw, sh, currentX, y, drawW, imageHeight)
+      drawFrameLabel(ctx, currentX + 6, y + 6, meta.label)
       currentX += drawW + gap
     }
   }
@@ -578,6 +587,22 @@ export async function createResultImage(params: {
   ctx.fillText('Generated in browser. Video is not uploaded to a server.', 56, canvas.height - 14)
 
   return canvas.toDataURL('image/png')
+}
+
+
+function drawFrameLabel(ctx: CanvasRenderingContext2D, x: number, y: number, text: string): void {
+  ctx.font = '600 16px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+  const metrics = ctx.measureText(text)
+  const paddingX = 10
+  const height = 26
+  const width = Math.ceil(metrics.width + paddingX * 2)
+  ctx.fillStyle = 'rgba(100, 116, 139, 0.82)'
+  roundRect(ctx, x, y, width, height, 8)
+  ctx.fill()
+  ctx.fillStyle = '#ffffff'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x + paddingX, y + height / 2)
+  ctx.textBaseline = 'alphabetic'
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
