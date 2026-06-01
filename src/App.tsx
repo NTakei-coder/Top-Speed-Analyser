@@ -275,13 +275,9 @@ function App() {
     setSequenceImages((prev) =>
       prev.map((image) => {
         if (image.id !== id) return image
-        const next = { ...image, [key]: value }
-        const totalCrop = next.cropLeftPercent + next.cropRightPercent
-        if (totalCrop > 85) {
-          if (key === 'cropLeftPercent') next.cropRightPercent = 85 - next.cropLeftPercent
-          if (key === 'cropRightPercent') next.cropLeftPercent = 85 - next.cropRightPercent
-        }
-        return next
+        const other = key === 'cropLeftPercent' ? image.cropRightPercent : image.cropLeftPercent
+        const clampedValue = Math.max(0, Math.min(60, Math.min(value, 85 - other)))
+        return { ...image, [key]: clampedValue }
       }),
     )
   }
@@ -293,10 +289,16 @@ function App() {
       const current = next[trimIndex]
       const target = next[trimIndex + 1]
       if (current && target) {
+        const deltaLeft = direction === 'ltr' ? 1 : -1
+        const deltaRight = direction === 'ltr' ? -1 : 1
+        const proposedLeft = Math.max(0, Math.min(60, current.cropLeftPercent + deltaLeft))
+        const proposedRight = Math.max(0, Math.min(60, current.cropRightPercent + deltaRight))
+        const total = proposedLeft + proposedRight
+        const adjustedRight = total > 85 ? Math.max(0, 85 - proposedLeft) : proposedRight
         next[trimIndex + 1] = {
           ...target,
-          cropLeftPercent: current.cropLeftPercent,
-          cropRightPercent: current.cropRightPercent,
+          cropLeftPercent: proposedLeft,
+          cropRightPercent: adjustedRight,
         }
       }
       return next
@@ -374,10 +376,6 @@ function App() {
             動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。
           </p>
         </div>
-        <div className="hero-badge">
-          <span>Browser only</span>
-          <strong>No server upload</strong>
-        </div>
       </section>
 
       {message && <div className={`notice ${isWorking ? 'working' : ''}`}>{message}</div>}
@@ -415,7 +413,7 @@ function App() {
               <li>走者がマーカーの間を走る際に、全区間を真横から見渡せるよう十分に離れて撮影してください。</li>
               <li>カメラはマーカーの中間位置から撮影してください。</li>
               <li>カメラから見たときに、走者レーンの0m地点延長線上にマーカー1、10m地点延長線上にマーカー2が来るように設置してください。</li>
-              <li>単にトラック上へ置くだけでは見た目上ズレるため、撮影位置が変わるとマーカー位置も変わります。撮影者の立ち位置を一定にしてください。</li>
+              <li>マーカーと撮影位置がずれると、正確に10mを測れないことがあります。位置がずれないようにしてください。</li>
               <li>正確な分析にはスロー動画で撮影してください。</li>
             </ul>
           </div>

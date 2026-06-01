@@ -757,3 +757,19 @@ video::-webkit-media-controls-start-playback-button {
   border-radius: 14px;
   background: #ffffff;
 }
+
+
+.assembled-block {
+  margin-top: 18px;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  white-space: nowrap;
+  padding-bottom: 8px;
+}
+
+.assembled-strip {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+}
