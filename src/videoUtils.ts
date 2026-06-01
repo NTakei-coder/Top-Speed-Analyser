@@ -232,8 +232,9 @@ export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSec
     throw new Error('ブラウザから十分なフレーム情報を取得できませんでした。撮影設定に合わせてFPSを手入力してください。')
   }
 
+  const snapped = Math.round(snapToCommonFps(rawFps) * 100) / 100
   return {
-    fps: snapToCommonFps(rawFps),
+    fps: snapped,
     rawFps: Math.round(rawFps * 100) / 100,
     samples,
     method,
@@ -379,8 +380,9 @@ export async function extractFpsFromVideoFile(file: File): Promise<FpsEstimateRe
     throw new Error('FPS計算に必要なメタデータが不足しています。')
   }
 
+  const snapped = Math.round(snapToCommonFps(rawFps) * 100) / 100
   return {
-    fps: snapToCommonFps(rawFps),
+    fps: snapped,
     rawFps: Math.round(rawFps * 100) / 100,
     samples: bestTrack.totalSamples,
     method: 'file metadata (mp4/mov)',
@@ -515,21 +517,35 @@ export async function createResultImage(params: {
 
   const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
   const availableW = width - 112
-  const itemW = Math.floor((availableW - gap * (images.length - 1)) / Math.max(images.length, 1))
   const y = headerHeight
-
-  for (let i = 0; i < images.length; i += 1) {
-    const img = await loadImage(images[i].dataUrl)
-    const sx = Math.round((images[i].cropLeftPercent / 100) * img.width)
-    const right = Math.round((images[i].cropRightPercent / 100) * img.width)
+  const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
+  const rawWidths = loaded.map((img, index) => {
+    const meta = images[index]
+    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+    const right = Math.round((meta.cropRightPercent / 100) * img.width)
     const sw = Math.max(1, img.width - sx - right)
-    const x = 56 + i * (itemW + gap)
-    ctx.drawImage(img, sx, 0, sw, img.height, x, y, itemW, imageHeight)
+    return imageHeight * (sw / img.height)
+  })
+  const rawTotalWidth = rawWidths.reduce((sum, value) => sum + value, 0)
+  const totalGap = gap * Math.max(0, images.length - 1)
+  const scale = rawTotalWidth > 0 ? Math.min(1, (availableW - totalGap) / rawTotalWidth) : 1
+  const widths = rawWidths.map((value) => Math.max(1, Math.round(value * scale)))
+
+  let currentX = 56
+  for (let i = 0; i < images.length; i += 1) {
+    const img = loaded[i]
+    const meta = images[i]
+    const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
+    const right = Math.round((meta.cropRightPercent / 100) * img.width)
+    const sw = Math.max(1, img.width - sx - right)
+    const drawW = widths[i]
+    ctx.drawImage(img, sx, 0, sw, img.height, currentX, y, drawW, imageHeight)
     ctx.fillStyle = 'rgba(15, 23, 42, 0.72)'
-    ctx.fillRect(x, y + imageHeight - 44, itemW, 44)
+    ctx.fillRect(currentX, y + imageHeight - 44, drawW, 44)
     ctx.fillStyle = '#ffffff'
     ctx.font = '600 20px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(`${images[i].label} / F${images[i].frame}`, x + 12, y + imageHeight - 16)
+    ctx.fillText(`${images[i].label} / F${images[i].frame}`, currentX + 12, y + imageHeight - 16)
+    currentX += drawW + gap
   }
 
   ctx.fillStyle = '#94a3b8'
