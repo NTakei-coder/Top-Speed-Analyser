@@ -494,22 +494,22 @@ export async function createResultImage(params: {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#0f172a'
   ctx.font = '700 54px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-  ctx.fillText('Top Speed Analyzer', 56, 78)
+  ctx.fillText('トップスピード分析結果', 56, 78)
 
   ctx.font = '400 28px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
   ctx.fillStyle = '#475569'
-  ctx.fillText(`${params.athleteName || 'No name'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / Marker ${formatNumber(params.distanceM, 2)} m`, 58, 124)
+  ctx.fillText(`${params.athleteName || '名前未入力'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / マーカー間距離 ${formatNumber(params.distanceM, 2)} m`, 58, 124)
 
   const metrics = [
-    { label: 'Top Speed', value: `${formatNumber(params.topSpeed, 2)} m/s`, big: true },
-    { label: 'Split Time', value: `${formatNumber(params.splitTime, 3)} s` },
-    { label: 'Pitch', value: `${formatNumber(params.pitch, 2)} step/s` },
-    { label: 'Stride', value: `${formatNumber(params.stride, 2)} m` },
-    { label: '100 m Prediction', value: `${formatNumber(params.predicted100m, 2)} s` },
-    { label: 'Right Contact', value: `${formatNumber(params.rightContactTime, 3)} s` },
-    { label: 'Right Flight', value: `${formatNumber(params.rightFlightTime, 3)} s` },
-    { label: 'Left Contact', value: `${formatNumber(params.leftContactTime, 3)} s` },
-    { label: 'Left Flight', value: `${formatNumber(params.leftFlightTime, 3)} s` },
+    { label: 'トップスピード', value: `${formatNumber(params.topSpeed, 2)} m/s`, big: true },
+    { label: 'マーカー間通過タイム', value: `${formatNumber(params.splitTime, 3)} s` },
+    { label: 'ピッチ', value: `${formatNumber(params.pitch, 2)} step/s` },
+    { label: 'ストライド', value: `${formatNumber(params.stride, 2)} m` },
+    { label: '100m予測タイム', value: `${formatNumber(params.predicted100m, 2)} s` },
+    { label: '右 接地時間', value: `${formatNumber(params.rightContactTime, 3)} s` },
+    { label: '右 滞空時間', value: `${formatNumber(params.rightFlightTime, 3)} s` },
+    { label: '左 接地時間', value: `${formatNumber(params.leftContactTime, 3)} s` },
+    { label: '左 滞空時間', value: `${formatNumber(params.leftFlightTime, 3)} s` },
   ]
 
   const cardW = 326
@@ -584,7 +584,7 @@ export async function createResultImage(params: {
 
   ctx.fillStyle = '#94a3b8'
   ctx.font = '400 18px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-  ctx.fillText('Generated in browser. Video is not uploaded to a server.', 56, canvas.height - 14)
+  ctx.fillText('ブラウザ内で生成。動画はサーバーにアップロードされません。', 56, canvas.height - 14)
 
   return canvas.toDataURL('image/png')
 }

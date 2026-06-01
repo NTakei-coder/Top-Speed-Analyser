@@ -454,6 +454,38 @@ function App() {
           <div className="pill">現在フレーム：{currentFrame}</div>
         </div>
 
+        <div className="frame-guide">
+          <div className="frame-guide-text">
+            <strong>コマ送りして指定のコマを登録してください</strong>
+            <p>画面右の指示文を確認し、動画を1コマずつ動かして、該当する瞬間で「現在コマを登録」を押します。</p>
+          </div>
+          <div className="frame-guide-flow" aria-label="コマ登録の流れ">
+            <div className="guide-step-card">
+              <div className="mini-screen instruction-mini">指示文を見る</div>
+              <span>1</span>
+              <strong>指示を確認</strong>
+              <p>例：1歩目が着地する瞬間</p>
+            </div>
+            <div className="flow-arrow">→</div>
+            <div className="guide-step-card">
+              <div className="mini-screen video-mini">
+                <div className="runner-dot" />
+                <div className="mini-controls">−1　＋1</div>
+              </div>
+              <span>2</span>
+              <strong>コマを探す</strong>
+              <p>コマ送り・スクロールバーで移動</p>
+            </div>
+            <div className="flow-arrow">→</div>
+            <div className="guide-step-card">
+              <div className="mini-screen button-mini">現在コマを登録</div>
+              <span>3</span>
+              <strong>登録する</strong>
+              <p>登録後、次の指示に進みます</p>
+            </div>
+          </div>
+        </div>
+
         <div className="video-layout">
           <div className="video-panel">
             {videoUrl ? (
