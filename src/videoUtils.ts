@@ -404,11 +404,15 @@ export async function createSequenceStripImage(params: {
   targetHeight?: number
   gap?: number
   background?: string
+  topCropPercent?: number
+  bottomCropPercent?: number
 }): Promise<string> {
   const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
   const targetHeight = params.targetHeight ?? 320
-  const gap = params.gap ?? 12
+  const gap = params.gap ?? 0
   const background = params.background ?? '#ffffff'
+  const topCropPercent = params.topCropPercent ?? 0
+  const bottomCropPercent = params.bottomCropPercent ?? 0
 
   if (images.length === 0) throw new Error('合成する連続写真がありません。')
 
@@ -418,7 +422,10 @@ export async function createSequenceStripImage(params: {
     const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
     const right = Math.round((meta.cropRightPercent / 100) * img.width)
     const sw = Math.max(1, img.width - sx - right)
-    return Math.round(targetHeight * (sw / img.height))
+    const sy = Math.round((topCropPercent / 100) * img.height)
+    const bottom = Math.round((bottomCropPercent / 100) * img.height)
+    const sh = Math.max(1, img.height - sy - bottom)
+    return Math.round(targetHeight * (sw / sh))
   })
 
   const width = widths.reduce((sum, w) => sum + w, 0) + gap * (images.length - 1)
@@ -437,7 +444,10 @@ export async function createSequenceStripImage(params: {
     const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
     const right = Math.round((meta.cropRightPercent / 100) * img.width)
     const sw = Math.max(1, img.width - sx - right)
-    ctx.drawImage(img, sx, 0, sw, img.height, x, 0, widths[i], targetHeight)
+    const sy = Math.round((topCropPercent / 100) * img.height)
+    const bottom = Math.round((bottomCropPercent / 100) * img.height)
+    const sh = Math.max(1, img.height - sy - bottom)
+    ctx.drawImage(img, sx, sy, sw, sh, x, 0, widths[i], targetHeight)
     x += widths[i] + gap
   }
 
@@ -460,12 +470,16 @@ export async function createResultImage(params: {
   predicted100m: number
   sequenceImages: SequenceImage[]
   direction: 'ltr' | 'rtl'
+  topCropPercent?: number
+  bottomCropPercent?: number
 }): Promise<string> {
   const width = 1800
   const headerHeight = 470
-  const gap = 16
+  const gap = 0
   const imageHeight = 430
   const footerHeight = 40
+  const topCropPercent = params.topCropPercent ?? 0
+  const bottomCropPercent = params.bottomCropPercent ?? 0
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = headerHeight + imageHeight + footerHeight
@@ -524,7 +538,10 @@ export async function createResultImage(params: {
     const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
     const right = Math.round((meta.cropRightPercent / 100) * img.width)
     const sw = Math.max(1, img.width - sx - right)
-    return imageHeight * (sw / img.height)
+    const sy = Math.round((topCropPercent / 100) * img.height)
+    const bottom = Math.round((bottomCropPercent / 100) * img.height)
+    const sh = Math.max(1, img.height - sy - bottom)
+    return imageHeight * (sw / sh)
   })
   const rawTotalWidth = rawWidths.reduce((sum, value) => sum + value, 0)
   const totalGap = gap * Math.max(0, images.length - 1)
@@ -538,8 +555,11 @@ export async function createResultImage(params: {
     const sx = Math.round((meta.cropLeftPercent / 100) * img.width)
     const right = Math.round((meta.cropRightPercent / 100) * img.width)
     const sw = Math.max(1, img.width - sx - right)
+    const sy = Math.round((topCropPercent / 100) * img.height)
+    const bottom = Math.round((bottomCropPercent / 100) * img.height)
+    const sh = Math.max(1, img.height - sy - bottom)
     const drawW = widths[i]
-    ctx.drawImage(img, sx, 0, sw, img.height, currentX, y, drawW, imageHeight)
+    ctx.drawImage(img, sx, sy, sw, sh, currentX, y, drawW, imageHeight)
     ctx.fillStyle = 'rgba(15, 23, 42, 0.72)'
     ctx.fillRect(currentX, y + imageHeight - 44, drawW, 44)
     ctx.fillStyle = '#ffffff'

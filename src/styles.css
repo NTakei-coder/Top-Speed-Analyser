@@ -679,3 +679,65 @@ video::-webkit-media-controls-start-playback-button {
     grid-template-columns: 1fr;
   }
 }
+
+.field-help {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.guide-block {
+  margin-top: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.guide-image {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid #dbe4ef;
+  display: block;
+}
+
+.guide-points {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #334155;
+  line-height: 1.7;
+}
+
+.nested-card {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.info-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #f8fafc;
+  padding: 20px;
+}
+
+.trim-instruction {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  line-height: 1.7;
+}
+
+.crop-mask.top {
+  left: 0;
+  right: 0;
+  top: 0;
+}
+
+.crop-mask.bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+}

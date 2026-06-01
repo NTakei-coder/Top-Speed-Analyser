@@ -15,6 +15,7 @@ import {
   getFpsPresetFromDuration,
   seekVideo,
 } from './videoUtils'
+import markerGuideImage from './marker-guide.png'
 
 const FRAME_STEPS: FrameStep[] = [
   { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
@@ -32,6 +33,29 @@ const FRAME_STEPS: FrameStep[] = [
 
 function quarterFrame(start: number, end: number, ratio: number): number {
   return Math.round(start + (end - start) * ratio)
+}
+
+function buildSequenceItems(frames: ReturnType<typeof createEmptyFrameSelection>) {
+  if (frames.td2 === null || frames.to2 === null || frames.td3 === null || frames.to3 === null || frames.td4 === null) return null
+  return [
+    { id: 'td2', label: '2歩目着地', frame: frames.td2 },
+    { id: 'td2_to2_q1', label: '2歩目接地 1/4', frame: quarterFrame(frames.td2, frames.to2, 0.25) },
+    { id: 'td2_to2_q2', label: '2歩目接地 1/2', frame: quarterFrame(frames.td2, frames.to2, 0.5) },
+    { id: 'td2_to2_q3', label: '2歩目接地 3/4', frame: quarterFrame(frames.td2, frames.to2, 0.75) },
+    { id: 'to2', label: '2歩目離地', frame: frames.to2 },
+    { id: 'to2_td3_q1', label: '2→3歩 1/4', frame: quarterFrame(frames.to2, frames.td3, 0.25) },
+    { id: 'to2_td3_q2', label: '2→3歩 1/2', frame: quarterFrame(frames.to2, frames.td3, 0.5) },
+    { id: 'to2_td3_q3', label: '2→3歩 3/4', frame: quarterFrame(frames.to2, frames.td3, 0.75) },
+    { id: 'td3', label: '3歩目着地', frame: frames.td3 },
+    { id: 'td3_to3_q1', label: '3歩目接地 1/4', frame: quarterFrame(frames.td3, frames.to3, 0.25) },
+    { id: 'td3_to3_q2', label: '3歩目接地 1/2', frame: quarterFrame(frames.td3, frames.to3, 0.5) },
+    { id: 'td3_to3_q3', label: '3歩目接地 3/4', frame: quarterFrame(frames.td3, frames.to3, 0.75) },
+    { id: 'to3', label: '3歩目離地', frame: frames.to3 },
+    { id: 'to3_td4_q1', label: '3→4歩 1/4', frame: quarterFrame(frames.to3, frames.td4, 0.25) },
+    { id: 'to3_td4_q2', label: '3→4歩 1/2', frame: quarterFrame(frames.to3, frames.td4, 0.5) },
+    { id: 'to3_td4_q3', label: '3→4歩 3/4', frame: quarterFrame(frames.to3, frames.td4, 0.75) },
+    { id: 'td4', label: '4歩目着地', frame: frames.td4 },
+  ]
 }
 
 function App() {
@@ -54,9 +78,12 @@ function App() {
   const [sequenceImages, setSequenceImages] = useState<SequenceImage[]>([])
   const [direction, setDirection] = useState<Direction>('ltr')
   const [trimIndex, setTrimIndex] = useState(0)
+  const [topCropPercent, setTopCropPercent] = useState(5)
+  const [bottomCropPercent, setBottomCropPercent] = useState(5)
   const [sequenceStripUrl, setSequenceStripUrl] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [isWorking, setIsWorking] = useState(false)
+  const [lastSequenceSignature, setLastSequenceSignature] = useState('')
 
   const totalFrames = useMemo(() => Math.max(0, Math.floor(duration * fps)), [duration, fps])
   const currentStep = FRAME_STEPS[stepIndex]
@@ -65,6 +92,7 @@ function App() {
   const orderedImages = useMemo(() => (direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages), [direction, sequenceImages])
   const currentTrimImage = sequenceImages[trimIndex] ?? null
   const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
+  const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
 
   const result = useMemo(() => {
     if (frameErrors.length > 0) return null
@@ -83,6 +111,36 @@ function App() {
     }
   }, [videoUrl])
 
+  useEffect(() => {
+    const signature = videoUrl && sequenceItems ? `${videoUrl}|${fps}|${sequenceItems.map((item) => item.frame).join('-')}` : ''
+    if (!signature || signature === lastSequenceSignature) return
+
+    let active = true
+    const run = async () => {
+      if (!videoUrl || !sequenceItems) return
+      setIsWorking(true)
+      setMessage('必要なフレームがそろったため、連続写真を自動作成しています。')
+      try {
+        const images = await captureSequenceFrames(videoUrl, sequenceItems, fps)
+        if (!active) return
+        setSequenceImages(images)
+        setTrimIndex(0)
+        setSequenceStripUrl(null)
+        setLastSequenceSignature(signature)
+        setMessage('17枚の連続写真を自動作成しました。横方向の余白を取り除き、1枚目で上下もラフに指定してください。')
+      } catch (error) {
+        if (!active) return
+        setMessage(error instanceof Error ? error.message : '連続写真を作成できませんでした。')
+      } finally {
+        if (active) setIsWorking(false)
+      }
+    }
+    void run()
+    return () => {
+      active = false
+    }
+  }, [videoUrl, fps, sequenceItems, lastSequenceSignature])
+
   const updateAthlete = <K extends keyof AthleteInfo>(key: K, value: AthleteInfo[K]) => {
     setAthlete((prev) => ({ ...prev, [key]: value }))
   }
@@ -94,6 +152,9 @@ function App() {
     setSequenceImages([])
     setSequenceStripUrl(null)
     setTrimIndex(0)
+    setTopCropPercent(5)
+    setBottomCropPercent(5)
+    setLastSequenceSignature('')
   }
 
   const handleVideoChange = async (file: File | null) => {
@@ -151,6 +212,7 @@ function App() {
     setSequenceImages([])
     setSequenceStripUrl(null)
     setTrimIndex(0)
+    setLastSequenceSignature('')
   }
 
   const moveFrame = async (delta: number) => {
@@ -174,6 +236,7 @@ function App() {
     setSequenceImages([])
     setSequenceStripUrl(null)
     setTrimIndex(0)
+    setLastSequenceSignature('')
     setStepIndex((prev) => Math.min(prev + 1, FRAME_STEPS.length))
   }
 
@@ -186,6 +249,7 @@ function App() {
     setSequenceImages([])
     setSequenceStripUrl(null)
     setTrimIndex(0)
+    setLastSequenceSignature('')
     setMessage(`${previousStep.shortLabel}の登録を取り消しました。`)
   }
 
@@ -202,48 +266,6 @@ function App() {
       setTd1Image(await captureFrameAt(videoUrl, frames.td1, fps))
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '画像を取得できませんでした。')
-    } finally {
-      setIsWorking(false)
-    }
-  }
-
-  const generateSequence = async () => {
-    if (!videoUrl) return
-    if (frames.td2 === null || frames.to2 === null || frames.td3 === null || frames.to3 === null || frames.td4 === null) {
-      setMessage('連続写真の作成には、2歩目着地・2歩目離地・3歩目着地・3歩目離地・4歩目着地の登録が必要です。')
-      return
-    }
-
-    const items = [
-      { id: 'td2', label: '2歩目着地', frame: frames.td2 },
-      { id: 'td2_to2_q1', label: '2歩目接地 1/4', frame: quarterFrame(frames.td2, frames.to2, 0.25) },
-      { id: 'td2_to2_q2', label: '2歩目接地 1/2', frame: quarterFrame(frames.td2, frames.to2, 0.5) },
-      { id: 'td2_to2_q3', label: '2歩目接地 3/4', frame: quarterFrame(frames.td2, frames.to2, 0.75) },
-      { id: 'to2', label: '2歩目離地', frame: frames.to2 },
-      { id: 'to2_td3_q1', label: '2→3歩 1/4', frame: quarterFrame(frames.to2, frames.td3, 0.25) },
-      { id: 'to2_td3_q2', label: '2→3歩 1/2', frame: quarterFrame(frames.to2, frames.td3, 0.5) },
-      { id: 'to2_td3_q3', label: '2→3歩 3/4', frame: quarterFrame(frames.to2, frames.td3, 0.75) },
-      { id: 'td3', label: '3歩目着地', frame: frames.td3 },
-      { id: 'td3_to3_q1', label: '3歩目接地 1/4', frame: quarterFrame(frames.td3, frames.to3, 0.25) },
-      { id: 'td3_to3_q2', label: '3歩目接地 1/2', frame: quarterFrame(frames.td3, frames.to3, 0.5) },
-      { id: 'td3_to3_q3', label: '3歩目接地 3/4', frame: quarterFrame(frames.td3, frames.to3, 0.75) },
-      { id: 'to3', label: '3歩目離地', frame: frames.to3 },
-      { id: 'to3_td4_q1', label: '3→4歩 1/4', frame: quarterFrame(frames.to3, frames.td4, 0.25) },
-      { id: 'to3_td4_q2', label: '3→4歩 1/2', frame: quarterFrame(frames.to3, frames.td4, 0.5) },
-      { id: 'to3_td4_q3', label: '3→4歩 3/4', frame: quarterFrame(frames.to3, frames.td4, 0.75) },
-      { id: 'td4', label: '4歩目着地', frame: frames.td4 },
-    ]
-
-    setIsWorking(true)
-    setMessage('連続写真を作成しています。')
-    try {
-      const images = await captureSequenceFrames(videoUrl, items, fps)
-      setSequenceImages(images)
-      setTrimIndex(0)
-      setSequenceStripUrl(null)
-      setMessage('連続写真を作成しました。1枚ずつ左右の切り取り率を設定してください。')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '連続写真を作成できませんでした。')
     } finally {
       setIsWorking(false)
     }
@@ -267,13 +289,13 @@ function App() {
 
   const assembleSequence = async () => {
     if (sequenceImages.length === 0) {
-      setMessage('先に連続写真を作成してください。')
+      setMessage('必要なフレームがそろうと連続写真が自動作成されます。')
       return
     }
     setIsWorking(true)
     setMessage('トリミング後の連続写真を合成しています。')
     try {
-      const dataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320 })
+      const dataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent })
       setSequenceStripUrl(dataUrl)
       setMessage('連続写真を合成しました。')
     } catch (error) {
@@ -289,7 +311,7 @@ function App() {
       return
     }
     if (sequenceImages.length === 0) {
-      setMessage('先に連続写真を作成してください。')
+      setMessage('必要なフレームがそろうと連続写真が自動作成されます。')
       return
     }
     setIsWorking(true)
@@ -310,6 +332,8 @@ function App() {
         predicted100m: result.predicted100m,
         sequenceImages,
         direction,
+        topCropPercent,
+        bottomCropPercent,
       })
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
       setMessage('結果シート画像を保存しました。')
@@ -345,7 +369,7 @@ function App() {
           <div className="form-grid">
             <label>
               ユーザー名
-              <input value={athlete.name} onChange={(e) => updateAthlete('name', e.target.value)} placeholder="例：Takei" />
+              <input value={athlete.name} onChange={(e) => updateAthlete('name', e.target.value)} />
             </label>
             <label>
               身長 cm
@@ -357,16 +381,24 @@ function App() {
                 <option value="male">男性</option>
                 <option value="female">女性</option>
               </select>
+              <p className="field-help">100m予測タイムの推定式に用いるため、生物学的性別を入力してください。</p>
             </label>
             <label>
               マーカー間距離 m
               <input type="number" value={distanceM} onChange={(e) => setDistanceM(Number(e.target.value))} step="0.01" min="0.1" />
             </label>
           </div>
-          <details className="hint">
-            <summary>性別入力について</summary>
-            <p>100m予測タイムの推定式に用いるため、生物学的性別を入力してください。</p>
-          </details>
+          <div className="guide-block">
+            <img src={markerGuideImage} alt="マーカー設置と撮影位置のガイド" className="guide-image" />
+            <ul className="guide-points">
+              <li>トップスピードが現れる付近を測定区間にしてください。目安は一般選手で40–50m付近、エリート選手で50–60m付近です。</li>
+              <li>走者がマーカーの間を走る際に、全区間を真横から見渡せるよう十分に離れて撮影してください。</li>
+              <li>カメラはマーカーの中間位置から撮影してください。</li>
+              <li>カメラから見たときに、走者レーンの0m地点延長線上にマーカー1、10m地点延長線上にマーカー2が来るように設置してください。</li>
+              <li>単にトラック上へ置くだけでは見た目上ズレるため、撮影位置が変わるとマーカー位置も変わります。撮影者の立ち位置を一定にしてください。</li>
+              <li>正確な分析にはスロー動画で撮影してください。</li>
+            </ul>
+          </div>
         </div>
 
         <div className="card">
@@ -380,6 +412,7 @@ function App() {
             <label>
               読み込みFPS
               <input type="number" value={fps} onChange={(e) => handleFpsChange(Number(e.target.value))} step="0.01" min="1" />
+              <p className="field-help">FPSが誤っている場合のみ、ここを手入力で修正してください。小数点以下第2位まで扱います。</p>
             </label>
             <label>
               動画時間 s
@@ -387,7 +420,6 @@ function App() {
             </label>
           </div>
           {fpsEstimateInfo && <p className="fps-estimate">{fpsEstimateInfo}</p>}
-          <p className="small-note">FPSが誤っている場合のみ、上の欄を手入力で修正してください。小数点以下第2位まで扱います。</p>
         </div>
       </section>
 
@@ -415,9 +447,7 @@ function App() {
                   const video = e.currentTarget
                   setDuration(video.duration || 0)
                   video.pause()
-                  if (!videoFile) {
-                    setFps(Number(getFpsPresetFromDuration(video.duration || 0).toFixed(2)))
-                  }
+                  if (!videoFile) setFps(Number(getFpsPresetFromDuration(video.duration || 0).toFixed(2)))
                 }}
                 onSeeked={(e) => syncFrameFromVideoTime(e.currentTarget)}
                 onTimeUpdate={(e) => syncFrameFromVideoTime(e.currentTarget)}
@@ -480,60 +510,54 @@ function App() {
           <button type="button" onClick={() => void captureTd1Again()} disabled={!videoUrl || frames.td1 === null}>1歩目画像を再取得</button>
         </div>
 
-        <div className="card">
-          <h2>5. 分析</h2>
-          {frameErrors.length > 0 ? (
-            <div className="error-box">
-              <strong>確認が必要です</strong>
-              <ul>
-                {frameErrors.slice(0, 5).map((error) => <li key={error}>{error}</li>)}
-              </ul>
+        {result ? (
+          <section className="card result-card nested-card">
+            <div className="section-header">
+              <div>
+                <h2>分析結果</h2>
+                <p className="muted">{athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
+              </div>
             </div>
-          ) : result ? (
-            <div className="success-box">必要なフレームがそろったため、分析結果を自動計算しました。</div>
-          ) : (
-            <div className="success-box">必要なフレームがそろうと、分析結果が自動で表示されます。</div>
-          )}
-        </div>
+            <div className="result-grid">
+              <Metric title="トップスピード" value={`${formatNumber(result.topSpeed, 2)} m/s`} accent />
+              <Metric title="マーカー間通過タイム" value={`${formatNumber(result.splitTime, 3)} s`} subtle />
+              <Metric title="ピッチ" value={`${formatNumber(result.pitch, 2)} step/s`} />
+              <Metric title="ストライド" value={`${formatNumber(result.stride, 2)} m`} />
+              <Metric title="100m予測タイム" value={`${formatNumber(result.predicted100m, 2)} s`} />
+              <Metric title="右 接地時間" value={`${formatNumber(result.rightContactTime, 3)} s`} />
+              <Metric title="右 滞空時間" value={`${formatNumber(result.rightFlightTime, 3)} s`} />
+              <Metric title="左 接地時間" value={`${formatNumber(result.leftContactTime, 3)} s`} />
+              <Metric title="左 滞空時間" value={`${formatNumber(result.leftFlightTime, 3)} s`} />
+            </div>
+            <details className="hint">
+              <summary>100m予測タイムについて</summary>
+              <p>
+                松尾ら（2017, 陸上競技研究紀要）の近似式より算出したものです。実際の競技中のトップスピードとゴールタイムの関係から計算したものであるため、練習で測定した場合は、0.2秒程度遅めに評価されることが普通です。個人差もあるので、練習と試合のパフォーマンス発揮の差が小さい選手は試合に近い値、差が大きい選手の場合は試合よりかなり遅く推定されます。
+              </p>
+            </details>
+          </section>
+        ) : (
+          <div className="card nested-card info-card">
+            <h2>分析結果</h2>
+            <p className="muted">必要なフレームがすべて登録されると、分析結果が自動表示されます。</p>
+            {frameErrors.length > 0 && (
+              <div className="error-box">
+                <strong>確認が必要です</strong>
+                <ul>
+                  {frameErrors.slice(0, 5).map((error) => <li key={error}>{error}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </section>
-
-      {result && (
-        <section className="card result-card">
-          <div className="section-header">
-            <div>
-              <h2>分析結果</h2>
-              <p className="muted">{athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
-            </div>
-          </div>
-
-          <div className="result-grid">
-            <Metric title="トップスピード" value={`${formatNumber(result.topSpeed, 2)} m/s`} accent />
-            <Metric title="マーカー間通過タイム" value={`${formatNumber(result.splitTime, 3)} s`} subtle />
-            <Metric title="ピッチ" value={`${formatNumber(result.pitch, 2)} step/s`} />
-            <Metric title="ストライド" value={`${formatNumber(result.stride, 2)} m`} />
-            <Metric title="100m予測タイム" value={`${formatNumber(result.predicted100m, 2)} s`} />
-            <Metric title="右 接地時間" value={`${formatNumber(result.rightContactTime, 3)} s`} />
-            <Metric title="右 滞空時間" value={`${formatNumber(result.rightFlightTime, 3)} s`} />
-            <Metric title="左 接地時間" value={`${formatNumber(result.leftContactTime, 3)} s`} />
-            <Metric title="左 滞空時間" value={`${formatNumber(result.leftFlightTime, 3)} s`} />
-          </div>
-
-          <details className="hint">
-            <summary>100m予測タイムについて</summary>
-            <p>
-              松尾ら（2017, 陸上競技研究紀要）の近似式より算出したものです。実際の競技中のトップスピードとゴールタイムの関係から計算したものであるため、練習で測定した場合は、0.2秒程度遅めに評価されることが普通です。個人差もあるので、練習と試合のパフォーマンス発揮の差が小さい選手は試合に近い値、差が大きい選手の場合は試合よりかなり遅く推定されます。
-            </p>
-          </details>
-        </section>
-      )}
 
       <section className="card">
         <div className="section-header">
           <div>
-            <h2>6. 連続写真</h2>
-            <p className="muted">2歩目着地から4歩目着地まで、各区間の1/4・1/2・3/4コマを含めて作成します。</p>
+            <h2>5. 連続写真トリミング</h2>
+            <p className="muted">必要なフレームがそろうと、17枚の連続写真が自動作成されます。</p>
           </div>
-          <button type="button" className="primary" onClick={() => void generateSequence()} disabled={!videoUrl}>連続写真を作成</button>
         </div>
 
         <div className="direction-control">
@@ -544,6 +568,9 @@ function App() {
 
         {sequenceImages.length > 0 ? (
           <>
+            <div className="trim-instruction">
+              横に並べるために、各写真の左右の無駄な余白をトリミングしてください。上下は1枚目でのみ、選手の頭上と足元に少し余裕を持たせてラフに指定してください。2枚目以降は同じ上下比率が自動適用されます。
+            </div>
             {currentTrimImage && (
               <div className="trim-workspace">
                 <div className="trim-stage">
@@ -555,13 +582,9 @@ function App() {
                     <img src={currentTrimImage.dataUrl} alt={currentTrimImage.label} className="overlay-image" />
                     <div className="crop-mask left" style={{ width: `${currentTrimImage.cropLeftPercent}%` }} />
                     <div className="crop-mask right" style={{ width: `${currentTrimImage.cropRightPercent}%` }} />
-                    <div
-                      className="crop-window"
-                      style={{
-                        left: `${currentTrimImage.cropLeftPercent}%`,
-                        right: `${currentTrimImage.cropRightPercent}%`,
-                      }}
-                    />
+                    <div className="crop-mask top" style={{ height: `${topCropPercent}%` }} />
+                    <div className="crop-mask bottom" style={{ height: `${bottomCropPercent}%` }} />
+                    <div className="crop-window" style={{ left: `${currentTrimImage.cropLeftPercent}%`, right: `${currentTrimImage.cropRightPercent}%`, top: `${topCropPercent}%`, bottom: `${bottomCropPercent}%` }} />
                   </div>
                 </div>
 
@@ -574,6 +597,19 @@ function App() {
                     右から何%切り取るか：{currentTrimImage.cropRightPercent}%
                     <input type="range" min="0" max="60" value={currentTrimImage.cropRightPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropRightPercent', Number(e.target.value))} />
                   </label>
+                  {trimIndex === 0 && (
+                    <>
+                      <label>
+                        上から何%切り取るか：{topCropPercent}%
+                        <input type="range" min="0" max="40" value={topCropPercent} onChange={(e) => { setTopCropPercent(Number(e.target.value)); setSequenceStripUrl(null) }} />
+                      </label>
+                      <label>
+                        下から何%切り取るか：{bottomCropPercent}%
+                        <input type="range" min="0" max="40" value={bottomCropPercent} onChange={(e) => { setBottomCropPercent(Number(e.target.value)); setSequenceStripUrl(null) }} />
+                      </label>
+                    </>
+                  )}
+                  {trimIndex > 0 && <p className="field-help">この写真には、1枚目で指定した上下トリミングが自動適用されます。</p>}
                   <div className="buttons">
                     <button type="button" onClick={() => setTrimIndex((prev) => Math.max(0, prev - 1))} disabled={trimIndex === 0}>前の写真</button>
                     <button type="button" onClick={() => setTrimIndex((prev) => Math.min(sequenceImages.length - 1, prev + 1))} disabled={trimIndex >= sequenceImages.length - 1}>次の写真</button>
@@ -591,11 +627,11 @@ function App() {
                 <img className="assembled-strip" src={sequenceStripUrl} alt="合成後の連続写真" />
               </div>
             ) : (
-              <div className="image-placeholder">「すべての写真を合成」を押すと、トリミング後の連続写真を横一列で表示します。</div>
+              <div className="image-placeholder">合成すると、写真間の余白なしで横一列に並べて表示します。</div>
             )}
 
             <div className="sequence-row compact-preview">
-              {orderedImages.map((image) => (
+              {orderedImages.slice(0, 6).map((image) => (
                 <div className="sequence-item" key={image.id}>
                   <div className="cropped-preview">
                     <img
@@ -607,30 +643,20 @@ function App() {
                       }}
                     />
                   </div>
-                  <div className="sequence-label">{image.label} / F{image.frame}</div>
+                  <div className="sequence-label">{image.label}</div>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          <div className="image-placeholder">連続写真はまだ作成されていません。</div>
+          <div className="image-placeholder">2歩目着地・2歩目離地・3歩目着地・3歩目離地・4歩目着地まで登録すると、自動で17枚の写真を作成します。</div>
         )}
       </section>
 
       <section className="card save-card">
-        <h2>7. 結果の保存</h2>
+        <h2>6. 結果の保存</h2>
         <p className="muted">トップスピード、ピッチ、ストライド、左右の接地時間、滞空時間、100m予測タイムと連続写真を1枚の結果シート画像として保存します。</p>
         <button type="button" className="primary wide save-button" onClick={() => void saveResultImage()} disabled={!result || sequenceImages.length === 0}>結果の保存</button>
-      </section>
-
-      <section className="card small-note">
-        <h2>撮影の推奨条件</h2>
-        <ul>
-          <li>120fps以上、可能であれば240fpsで撮影してください。</li>
-          <li>カメラはマーカー区間の中央付近から、できるだけ横方向に設置してください。</li>
-          <li>マーカー間距離は正確に測定してください。</li>
-          <li>MP4/MOVでは動画ファイルのメタデータからFPS取得を試みます。誤っている場合のみ手入力で修正してください。</li>
-        </ul>
       </section>
     </main>
   )
