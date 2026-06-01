@@ -12,12 +12,23 @@ export function formatNumber(value: number, digits: number): string {
 export async function seekVideo(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve) => {
     const safeTime = Math.max(0, Math.min(time, Number.isFinite(video.duration) ? video.duration : time))
-    const onSeeked = () => {
+    let resolved = false
+    const finish = () => {
+      if (resolved) return
+      resolved = true
       video.removeEventListener('seeked', onSeeked)
+      window.clearTimeout(timeoutId)
       // 描画タイミングを安定させる
       requestAnimationFrame(() => resolve())
     }
+    const onSeeked = () => finish()
+    const timeoutId = window.setTimeout(finish, 450)
+
     video.addEventListener('seeked', onSeeked)
+    if (Math.abs(video.currentTime - safeTime) < 0.0005) {
+      finish()
+      return
+    }
     video.currentTime = safeTime
   })
 }
@@ -76,6 +87,162 @@ export async function captureSequenceFrames(
   video.removeAttribute('src')
   video.load()
   return images
+}
+
+
+export type FpsEstimateResult = {
+  fps: number
+  rawFps: number
+  samples: number
+  method: string
+}
+
+type VideoFrameCallbackMetadataLike = {
+  mediaTime: number
+  presentedFrames?: number
+}
+
+type HTMLVideoElementWithFrameCallback = HTMLVideoElement & {
+  requestVideoFrameCallback?: (callback: (now: number, metadata: VideoFrameCallbackMetadataLike) => void) => number
+  cancelVideoFrameCallback?: (handle: number) => void
+  webkitDecodedFrameCount?: number
+}
+
+const COMMON_FPS_VALUES = [
+  23.976, 24, 25, 29.97, 30,
+  50, 59.94, 60,
+  100, 119.88, 120,
+  200, 239.76, 240,
+]
+
+export function snapToCommonFps(rawFps: number): number {
+  if (!Number.isFinite(rawFps) || rawFps <= 0) return 120
+  let best = COMMON_FPS_VALUES[0]
+  let bestDiff = Math.abs(rawFps - best)
+  for (const candidate of COMMON_FPS_VALUES) {
+    const diff = Math.abs(rawFps - candidate)
+    if (diff < bestDiff) {
+      best = candidate
+      bestDiff = diff
+    }
+  }
+  // 代表的なFPSに近い場合は丸める。離れている場合は生値を小数2桁で返す。
+  if (bestDiff <= Math.max(0.6, best * 0.015)) return best
+  return Math.round(rawFps * 100) / 100
+}
+
+export function getFpsPresetFromDuration(duration: number): number {
+  if (!Number.isFinite(duration) || duration <= 0) return 120
+  // トップスピード測定は120/240fps撮影が多いので、初期値は120fpsに寄せる。
+  return 120
+}
+
+function getPlaybackFrameCount(video: HTMLVideoElementWithFrameCallback): number | null {
+  const quality = typeof video.getVideoPlaybackQuality === 'function' ? video.getVideoPlaybackQuality() : null
+  const total = quality?.totalVideoFrames
+  if (typeof total === 'number' && Number.isFinite(total) && total > 0) return total
+  if (typeof video.webkitDecodedFrameCount === 'number' && Number.isFinite(video.webkitDecodedFrameCount)) return video.webkitDecodedFrameCount
+  return null
+}
+
+export async function estimateFpsFromPlayback(video: HTMLVideoElement, sampleSeconds = 1.2): Promise<FpsEstimateResult> {
+  const v = video as HTMLVideoElementWithFrameCallback
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    throw new Error('動画時間を取得できないためFPSを推定できません。')
+  }
+
+  const originalTime = video.currentTime
+  const originalMuted = video.muted
+  const originalRate = video.playbackRate
+  const targetStart = Math.min(Math.max(0, originalTime), Math.max(0, video.duration - sampleSeconds - 0.2))
+
+  video.muted = true
+  video.playbackRate = 1
+  await seekVideo(video, targetStart)
+
+  const firstCounter = getPlaybackFrameCount(v)
+  const firstMediaTime = video.currentTime
+
+  let rafHandle: number | null = null
+  let samples = 0
+  let firstRvfcFrames: number | null = null
+  let lastRvfcFrames: number | null = null
+  let firstRvfcMediaTime: number | null = null
+  let lastRvfcMediaTime: number | null = null
+
+  const canUseRvfc = typeof v.requestVideoFrameCallback === 'function'
+
+  const rvfcPromise = new Promise<void>((resolve) => {
+    if (!canUseRvfc || !v.requestVideoFrameCallback) {
+      resolve()
+      return
+    }
+    const startedAt = performance.now()
+    const onFrame = (_now: number, metadata: VideoFrameCallbackMetadataLike) => {
+      samples += 1
+      if (firstRvfcMediaTime === null) {
+        firstRvfcMediaTime = metadata.mediaTime
+        firstRvfcFrames = metadata.presentedFrames ?? samples
+      }
+      lastRvfcMediaTime = metadata.mediaTime
+      lastRvfcFrames = metadata.presentedFrames ?? samples
+
+      const elapsed = performance.now() - startedAt
+      if (elapsed >= sampleSeconds * 1000 || (metadata.mediaTime - (firstRvfcMediaTime ?? metadata.mediaTime)) >= sampleSeconds) {
+        resolve()
+        return
+      }
+      rafHandle = v.requestVideoFrameCallback?.(onFrame) ?? null
+    }
+    rafHandle = v.requestVideoFrameCallback(onFrame)
+  })
+
+  try {
+    await video.play()
+    await Promise.race([
+      rvfcPromise,
+      new Promise<void>((resolve) => window.setTimeout(resolve, Math.ceil(sampleSeconds * 1000) + 250)),
+    ])
+  } finally {
+    video.pause()
+    if (rafHandle !== null && typeof v.cancelVideoFrameCallback === 'function') {
+      v.cancelVideoFrameCallback(rafHandle)
+    }
+  }
+
+  const lastCounter = getPlaybackFrameCount(v)
+  const lastMediaTime = video.currentTime
+
+  video.playbackRate = originalRate
+  video.muted = originalMuted
+  await seekVideo(video, originalTime)
+
+  let rawFps = NaN
+  let method = ''
+
+  if (firstCounter !== null && lastCounter !== null && lastCounter > firstCounter && lastMediaTime > firstMediaTime) {
+    rawFps = (lastCounter - firstCounter) / (lastMediaTime - firstMediaTime)
+    method = 'playbackQuality'
+  }
+
+  if ((!Number.isFinite(rawFps) || rawFps <= 1) && firstRvfcMediaTime !== null && lastRvfcMediaTime !== null && lastRvfcMediaTime > firstRvfcMediaTime) {
+    const frameDelta = (lastRvfcFrames ?? samples) - (firstRvfcFrames ?? 1)
+    if (frameDelta > 0) {
+      rawFps = frameDelta / (lastRvfcMediaTime - firstRvfcMediaTime)
+      method = 'requestVideoFrameCallback'
+    }
+  }
+
+  if (!Number.isFinite(rawFps) || rawFps <= 1) {
+    throw new Error('ブラウザから十分なフレーム情報を取得できませんでした。撮影設定に合わせてFPSを手入力してください。')
+  }
+
+  return {
+    fps: snapToCommonFps(rawFps),
+    rawFps: Math.round(rawFps * 100) / 100,
+    samples,
+    method,
+  }
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string): void {

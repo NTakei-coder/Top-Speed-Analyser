@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles.css'
 import { calculateSprintResult, createEmptyFrameSelection, validateFrames } from './calculator'
 import type { AthleteInfo, Direction, FirstStepFoot, FrameKey, FrameStep, SequenceImage, Sex, SprintResult } from './types'
-import { captureCurrentFrame, captureFrameAt, captureSequenceFrames, clamp, createResultImage, downloadDataUrl, formatNumber, seekVideo } from './videoUtils'
+import { captureCurrentFrame, captureFrameAt, captureSequenceFrames, clamp, createResultImage, downloadDataUrl, estimateFpsFromPlayback, formatNumber, getFpsPresetFromDuration, seekVideo } from './videoUtils'
 
 const FRAME_STEPS: FrameStep[] = [
   { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
@@ -24,9 +24,12 @@ function getFrameLabel(key: FrameKey): string {
 
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const programmaticSeekRef = useRef(false)
   const [athlete, setAthlete] = useState<AthleteInfo>({ name: '', heightCm: 170, sex: 'male' })
   const [distanceM, setDistanceM] = useState(10)
   const [fps, setFps] = useState(120)
+  const [estimatedFps, setEstimatedFps] = useState<number | null>(null)
+  const [fpsEstimateInfo, setFpsEstimateInfo] = useState('')
   const [duration, setDuration] = useState(0)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoName, setVideoName] = useState('')
@@ -63,6 +66,8 @@ function App() {
     setVideoUrl(url)
     setVideoName(file.name)
     setCurrentFrame(0)
+    setEstimatedFps(null)
+    setFpsEstimateInfo('')
     setFrames(createEmptyFrameSelection())
     setStepIndex(0)
     setTd1Image(null)
@@ -75,7 +80,49 @@ function App() {
     if (!videoRef.current) return
     const safeFrame = clamp(Math.round(frame), 0, totalFrames || Number.MAX_SAFE_INTEGER)
     setCurrentFrame(safeFrame)
-    await seekVideo(videoRef.current, safeFrame / fps)
+    programmaticSeekRef.current = true
+    try {
+      await seekVideo(videoRef.current, safeFrame / fps)
+    } finally {
+      programmaticSeekRef.current = false
+    }
+  }
+
+  const syncFrameFromVideoTime = (video: HTMLVideoElement) => {
+    if (programmaticSeekRef.current) return
+    if (!Number.isFinite(video.currentTime)) return
+    setCurrentFrame(Math.max(0, Math.round(video.currentTime * fps)))
+  }
+
+  const handleFpsChange = (nextFps: number) => {
+    if (!Number.isFinite(nextFps) || nextFps <= 0) return
+    const currentTime = videoRef.current?.currentTime ?? currentFrame / fps
+    setFps(nextFps)
+    setCurrentFrame(Math.max(0, Math.round(currentTime * nextFps)))
+    setResult(null)
+    setSequenceImages([])
+    setFpsEstimateInfo('FPSを変更しました。登録済みフレームがある場合は、必要に応じて再確認してください。')
+  }
+
+  const estimateFps = async () => {
+    if (!videoRef.current) {
+      setMessage('先に動画を選択してください。')
+      return
+    }
+    setIsWorking(true)
+    setMessage('FPSを推定しています。短時間だけ動画を再生してフレーム情報を確認します。')
+    try {
+      const result = await estimateFpsFromPlayback(videoRef.current)
+      setEstimatedFps(result.fps)
+      handleFpsChange(result.fps)
+      setFpsEstimateInfo(`推定FPS：${formatNumber(result.fps, 2)} fps（生値 ${formatNumber(result.rawFps, 2)} / ${result.method}）`)
+      setMessage('FPS推定が完了しました。撮影設定が120fpsまたは240fpsの場合は、念のため値を確認してください。')
+    } catch (error) {
+      setFpsEstimateInfo('自動推定できませんでした。撮影設定に合わせて120または240などを手動入力してください。')
+      setMessage(error instanceof Error ? error.message : 'FPSを推定できませんでした。')
+    } finally {
+      setIsWorking(false)
+    }
   }
 
   const moveFrame = async (delta: number) => {
@@ -290,15 +337,23 @@ function App() {
           <div className="form-grid">
             <label>
               使用FPS
-              <input type="number" value={fps} onChange={(e) => setFps(Number(e.target.value))} step="0.01" min="1" />
+              <input type="number" value={fps} onChange={(e) => handleFpsChange(Number(e.target.value))} step="0.01" min="1" />
             </label>
             <label>
               動画時間 s
               <input value={formatNumber(duration, 3)} readOnly />
             </label>
           </div>
+          <div className="buttons fps-buttons">
+            <button type="button" onClick={() => handleFpsChange(120)} disabled={!videoUrl}>120fpsにする</button>
+            <button type="button" onClick={() => handleFpsChange(240)} disabled={!videoUrl}>240fpsにする</button>
+            <button type="button" className="primary" onClick={estimateFps} disabled={!videoUrl || isWorking}>FPSを推定</button>
+          </div>
+          {(estimatedFps !== null || fpsEstimateInfo) && (
+            <p className="fps-estimate">{fpsEstimateInfo || `推定FPS：${formatNumber(estimatedFps ?? fps, 2)} fps`}</p>
+          )}
           <p className="small-note">
-            iPhone動画は可変フレームレートの可能性があります。推奨撮影が120fpsなら、使用FPSを120に修正してください。
+            コマ送りは「現在フレーム番号」を基準にして、1/fps秒ずつ移動します。iPhone動画は可変フレームレートの可能性があるため、推定後も撮影設定が120fpsなら120、240fpsなら240に合わせてください。
           </p>
         </div>
       </section>
@@ -323,13 +378,17 @@ function App() {
                 preload="metadata"
                 onLoadedMetadata={(e) => {
                   const video = e.currentTarget
-                  setDuration(video.duration || 0)
+                  const nextDuration = video.duration || 0
+                  setDuration(nextDuration)
+                  const presetFps = getFpsPresetFromDuration(nextDuration)
+                  setFps(presetFps)
+                  setCurrentFrame(0)
+                  setEstimatedFps(null)
+                  setFpsEstimateInfo('動画を読み込みました。必要に応じて「FPSを推定」または120/240fpsボタンを使ってください。')
                   video.pause()
                 }}
-                onTimeUpdate={(e) => {
-                  if (!Number.isFinite(e.currentTarget.currentTime)) return
-                  setCurrentFrame(Math.round(e.currentTarget.currentTime * fps))
-                }}
+                onSeeked={(e) => syncFrameFromVideoTime(e.currentTarget)}
+                onTimeUpdate={(e) => syncFrameFromVideoTime(e.currentTarget)}
               />
             ) : (
               <div className="video-placeholder">動画を選択してください</div>
