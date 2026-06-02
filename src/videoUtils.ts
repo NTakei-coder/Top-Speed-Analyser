@@ -399,6 +399,31 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
   document.body.removeChild(a)
 }
 
+
+function translateFrameLabel(label: string, language: 'ja' | 'en'): string {
+  if (language !== 'en') return label
+  const map: Record<string, string> = {
+    '2歩目接地': '2nd step touchdown',
+    '2歩目接地期前半': '2nd contact early',
+    '2歩目接地期中盤': '2nd contact mid',
+    '2歩目接地期後半': '2nd contact late',
+    '2歩目離地': '2nd step toe-off',
+    '2-3歩滞空期前半': '2nd-3rd flight early',
+    '2-3歩滞空期中盤': '2nd-3rd flight mid',
+    '2-3歩滞空期後半': '2nd-3rd flight late',
+    '3歩目接地': '3rd step touchdown',
+    '3歩目接地期前半': '3rd contact early',
+    '3歩目接地期中盤': '3rd contact mid',
+    '3歩目接地期後半': '3rd contact late',
+    '3歩目離地': '3rd step toe-off',
+    '3-4歩滞空期前半': '3rd-4th flight early',
+    '3-4歩滞空期中盤': '3rd-4th flight mid',
+    '3-4歩滞空期後半': '3rd-4th flight late',
+    '4歩目接地': '4th step touchdown',
+  }
+  return map[label] ?? label
+}
+
 export async function createSequenceStripImage(params: {
   sequenceImages: SequenceImage[]
   direction: 'ltr' | 'rtl'
@@ -407,6 +432,7 @@ export async function createSequenceStripImage(params: {
   background?: string
   topCropPercent?: number
   bottomCropPercent?: number
+  language?: 'ja' | 'en'
 }): Promise<string> {
   const images = params.direction === 'rtl' ? [...params.sequenceImages].reverse() : params.sequenceImages
   const targetHeight = params.targetHeight ?? 320
@@ -414,6 +440,7 @@ export async function createSequenceStripImage(params: {
   const background = params.background ?? '#ffffff'
   const topCropPercent = params.topCropPercent ?? 0
   const bottomCropPercent = params.bottomCropPercent ?? 0
+  const language = params.language ?? 'ja'
   if (images.length === 0) throw new Error('合成する連続写真がありません。')
 
   const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
@@ -448,7 +475,7 @@ export async function createSequenceStripImage(params: {
     const bottom = Math.round((bottomCropPercent / 100) * img.height)
     const sh = Math.max(1, img.height - sy - bottom)
     ctx.drawImage(img, sx, sy, sw, sh, x, 0, widths[i], targetHeight)
-    drawFrameLabel(ctx, x + 6, 6, meta.label)
+    drawFrameLabel(ctx, x + 6, 6, translateFrameLabel(meta.label, language))
     x += widths[i] + gap
   }
 
