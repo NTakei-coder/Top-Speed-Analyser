@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './styles.css'
 import TopSpeedAnalyzer from './TopSpeedAnalyzer'
+import { getInitialLanguage, installStaticTranslator, languageNames, saveLanguage, ui, type Language } from './i18n'
 
 type AppMode = 'top-speed' | 'baton'
 
@@ -11,12 +12,18 @@ function getInitialMode(): AppMode {
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>(getInitialMode)
+  const [language, setLanguage] = useState<Language>(getInitialLanguage)
 
   useEffect(() => {
     const onHashChange = () => setMode(getInitialMode())
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
+
+  useEffect(() => {
+    saveLanguage(language)
+    return installStaticTranslator(language)
+  }, [language, mode])
 
   const switchMode = (nextMode: AppMode) => {
     setMode(nextMode)
@@ -27,6 +34,11 @@ export default function App() {
   return (
     <>
       <div className="analysis-switch-shell">
+        <div className="language-switch" aria-label={ui[language].language}>
+          <span>{ui[language].language}</span>
+          <button type="button" className={language === 'ja' ? 'active' : ''} onClick={() => setLanguage('ja')}>{languageNames.ja}</button>
+          <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>{languageNames.en}</button>
+        </div>
         <div className="analysis-switch" role="tablist" aria-label="分析機能の切り替え">
           <button
             type="button"
@@ -35,7 +47,7 @@ export default function App() {
             className={mode === 'top-speed' ? 'active' : ''}
             onClick={() => switchMode('top-speed')}
           >
-            トップスピード分析
+            {ui[language].topSpeedTab}
           </button>
           <button
             type="button"
@@ -44,18 +56,19 @@ export default function App() {
             className={mode === 'baton' ? 'active' : ''}
             onClick={() => switchMode('baton')}
           >
-            バトンパス分析
+            {ui[language].batonTab}
           </button>
         </div>
       </div>
 
       {mode === 'top-speed' ? (
-        <TopSpeedAnalyzer />
+        <TopSpeedAnalyzer language={language} />
       ) : (
         <iframe
           className="baton-analysis-frame"
-          title="バトンパス分析"
-          src="/baton.html"
+          key={language}
+          title={ui[language].batonTab}
+          src={`/baton.html?lang=${language}`}
         />
       )}
     </>

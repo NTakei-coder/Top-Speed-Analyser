@@ -15,7 +15,7 @@ import {
   getFpsPresetFromDuration,
   seekVideo,
 } from './videoUtils'
-import markerGuideImage from './marker-guide.png'
+import { ui, type Language } from './i18n'
 
 const FRAME_STEPS: FrameStep[] = [
   { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
@@ -109,7 +109,50 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime })
 }
 
-function App() {
+
+function TopSpeedGuideGraphic({ language }: { language: Language }) {
+  const isEn = language === 'en'
+  return (
+    <div className="guide-graphic" aria-label={isEn ? 'Marker setup and camera position guide' : 'マーカー設置と撮影位置のガイド'}>
+      <svg viewBox="0 0 760 420" role="img" className="guide-graphic-svg">
+        <rect x="0" y="0" width="760" height="420" rx="28" fill="#f8fafc" />
+        <rect x="58" y="112" width="612" height="72" rx="28" fill="#e2e8f0" />
+        <rect x="58" y="112" width="612" height="8" fill="#cbd5e1" opacity="0.9" />
+        <line x1="160" y1="95" x2="160" y2="205" stroke="#ef4444" strokeWidth="4" />
+        <line x1="540" y1="95" x2="540" y2="205" stroke="#ef4444" strokeWidth="4" />
+        <rect x="124" y="74" width="72" height="30" rx="15" fill="#0f172a" />
+        <rect x="496" y="74" width="88" height="30" rx="15" fill="#0f172a" />
+        <text x="160" y="94" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Marker 1' : 'マーカー1'}</text>
+        <text x="540" y="94" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Marker 2' : 'マーカー2'}</text>
+        <line x1="160" y1="228" x2="540" y2="228" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
+        <polygon points="160,228 176,220 176,236" fill="#334155" />
+        <polygon points="540,228 524,220 524,236" fill="#334155" />
+        <text x="350" y="216" textAnchor="middle" fontSize="22" fontWeight="900" fill="#0f172a">{isEn ? 'Default 10 m interval' : '初期値 10 m区間'}</text>
+        <circle cx="356" cy="149" r="17" fill="#f97316" />
+        <path d="M344 170 C368 180 388 178 410 164" fill="none" stroke="#f97316" strokeWidth="7" strokeLinecap="round" />
+        <path d="M344 148 C326 158 314 174 300 190" fill="none" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+        <path d="M370 150 C390 158 406 170 424 186" fill="none" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+        <rect x="324" y="306" width="64" height="42" rx="10" fill="#0f172a" />
+        <path d="M356 348 L326 388 M356 348 L386 388 M356 348 L356 390" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="356" cy="327" r="8" fill="#94a3b8" />
+        <path d="M356 306 L160 184 M356 306 L540 184 M356 306 L350 228" stroke="#64748b" strokeWidth="2.5" strokeDasharray="8 8" fill="none" />
+        <rect x="236" y="356" width="240" height="32" rx="16" fill="#1e3a8a" />
+        <text x="356" y="378" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Film from the midpoint' : 'マーカーの中間で撮影'}</text>
+        <rect x="40" y="274" width="230" height="54" rx="18" fill="#eff6ff" stroke="#bfdbfe" />
+        <text x="155" y="296" textAnchor="middle" fontSize="14" fontWeight="800" fill="#1d4ed8">{isEn ? 'Stand far enough away' : '十分に離れて撮影'}</text>
+        <text x="155" y="316" textAnchor="middle" fontSize="11" fontWeight="600" fill="#475569">{isEn ? 'Keep the runner side-on throughout' : '全区間を真横から見渡す'}</text>
+        <rect x="462" y="274" width="258" height="54" rx="18" fill="#fff7ed" stroke="#fed7aa" />
+        <text x="591" y="296" textAnchor="middle" fontSize="14" fontWeight="800" fill="#c2410c">{isEn ? 'Use slow-motion video' : 'スロー動画で撮影'}</text>
+        <text x="591" y="316" textAnchor="middle" fontSize="11" fontWeight="600" fill="#475569">{isEn ? '120 fps or higher recommended' : '120 fps以上推奨'}</text>
+        <rect x="42" y="22" width="676" height="38" rx="19" fill="#0f172a" />
+        <text x="380" y="47" textAnchor="middle" fontSize="15" fontWeight="800" fill="#fff">{isEn ? 'Measure near the top-speed phase: general 40–50 m, elite 50–60 m' : 'トップスピード付近で測定：一般 40–50m、エリート 50–60m'}</text>
+      </svg>
+    </div>
+  )
+}
+
+function App({ language = 'ja' }: { language?: Language }) {
+  const topText = ui[language]
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
 
@@ -141,7 +184,7 @@ function App() {
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
   const currentTrimImage = sequenceImages[trimIndex] ?? null
-  const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
+  const sexLabel = athlete.sex === 'male' ? (language === 'en' ? 'Male' : '男性') : (language === 'en' ? 'Female' : '女性')
   const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
 
   const result = useMemo(() => {
@@ -365,7 +408,7 @@ function App() {
     setIsWorking(true)
     setMessage('トリミング後の連続写真を合成しています。')
     try {
-      const dataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent })
+      const dataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent, language })
       setSequenceStripUrl(dataUrl)
       setMessage('連続写真を合成しました。')
     } catch (error) {
@@ -378,11 +421,11 @@ function App() {
   const createTopSpeedResultDataUrl = async (): Promise<string> => {
     if (!result) throw new Error('必要なフレームがすべて登録されると結果が自動表示されます。')
     if (sequenceImages.length === 0) throw new Error('必要なフレームがそろうと連続写真が自動作成されます。')
-    const stripDataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent })
+    const stripDataUrl = await createSequenceStripImage({ sequenceImages, direction, targetHeight: 320, topCropPercent, bottomCropPercent, language })
     setSequenceStripUrl(stripDataUrl)
     const displayImages = direction === 'rtl' ? [...sequenceImages].reverse() : sequenceImages
-    const row1StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(0, 8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent })
-    const row2StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent })
+    const row1StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(0, 8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent, language })
+    const row2StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent, language })
     return await createResultImage({
       athleteName: athlete.name,
       date: athlete.date,
@@ -405,6 +448,7 @@ function App() {
       sequenceStripRow1DataUrl: row1StripDataUrl,
       sequenceStripRow2DataUrl: row2StripDataUrl,
       appUrl: window.location.origin + window.location.pathname,
+      language,
     })
   }
 
@@ -425,13 +469,23 @@ function App() {
   const shareResult = async () => {
     const appUrl = window.location.origin + window.location.pathname
     const shareText = result
-      ? `トップスピード分析アプリで分析したよ。
+      ? language === 'en'
+        ? `${topText.topSpeedShareIntro}
+Top speed: ${formatNumber(result.topSpeed, 2)} m/s
+Pitch: ${formatNumber(result.pitch, 2)} step/s
+Stride: ${formatNumber(result.stride, 2)} m
+Predicted 100 m time: ${formatNumber(result.predicted100m, 2)} s
+${topText.appLink}: ${appUrl}`
+        : `${topText.topSpeedShareIntro}
 トップスピード: ${formatNumber(result.topSpeed, 2)} m/s
 ピッチ：${formatNumber(result.pitch, 2)} step/s
 ストライド：${formatNumber(result.stride, 2)} m
 100m予測タイム: ${formatNumber(result.predicted100m, 2)} s
 ${appUrl}`
-      : `トップスピード分析アプリで分析できます。
+      : language === 'en'
+        ? `Analyze your sprint with the Top Speed Analysis app.
+${topText.appLink}: ${appUrl}`
+        : `トップスピード分析アプリで分析できます。
 ${appUrl}`
 
     setIsWorking(true)
@@ -440,13 +494,13 @@ ${appUrl}`
         const dataUrl = await createTopSpeedResultDataUrl()
         const file = new File([dataUrlToBlob(dataUrl)], `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`, { type: 'image/png' })
         if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ title: 'トップスピード分析結果', text: shareText, url: appUrl, files: [file] })
+          await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl, files: [file] })
           setMessage('共有メニューを開きました。')
           return
         }
       }
       if (navigator.share) {
-        await navigator.share({ title: 'トップスピード分析結果', text: shareText, url: appUrl })
+        await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl })
         setMessage('共有メニューを開きました。画像は必要に応じて別途保存してください。')
       } else {
         await navigator.clipboard.writeText(shareText)
@@ -465,9 +519,9 @@ ${appUrl}`
       <section className="hero">
         <div>
           <p className="eyebrow">Top Speed Analyzer</p>
-          <h1>トップスピード分析</h1>
+          <h1>{topText.topSpeedTitle}</h1>
           <p className="hero-copy">
-            動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。
+            {language === 'en' ? 'Analyze sprint video in the browser and calculate top speed, pitch, stride, bilateral contact/flight times, and predicted 100 m time.' : '動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。'}
           </p>
         </div>
       </section>
@@ -505,7 +559,7 @@ ${appUrl}`
             </label>
           </div>
           <div className="guide-block">
-            <img src={markerGuideImage} alt="マーカー設置と撮影位置のガイド" className="guide-image" />
+            <TopSpeedGuideGraphic language={language} />
             <ul className="guide-points">
               <li>トップスピードが現れる付近を測定区間にしてください。目安は一般選手で40–50m付近、エリート選手で50–60m付近です。</li>
               <li>走者がマーカーの間を走る際に、全区間を真横から見渡せるよう十分に離れて撮影してください。</li>

@@ -669,18 +669,19 @@ function BatonZonePosition({ distance }) {
 
 
 
-function BatonMarkerGuide() {
+function BatonMarkerGuide({ language = "ja" } = {}) {
+  const isEn = language === "en";
   const markers = [40, 35, 30, 25, 20, 15, 10, 5, 0, -5];
   const xFor = (distance) => 40 + ((40 - distance) / 45) * 300;
   const startX = 356;
   return (
     <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
-      <div className="mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-slate-500" /><h2 className="text-sm font-bold text-slate-700">マーカー設置・撮影方法</h2></div>
+      <div className="mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-slate-500" /><h2 className="text-sm font-bold text-slate-700">{isEn ? "Marker setup and filming guide" : "マーカー設置・撮影方法"}</h2></div>
       <div className="overflow-hidden rounded-3xl border border-slate-100 bg-slate-50 p-3">
         <svg viewBox="0 0 380 250" className="h-auto w-full" role="img" aria-label="バトンゾーンのマーカー設置図">
           <rect x="22" y="56" width="336" height="54" rx="18" fill="#e2e8f0" />
           <rect x={xFor(30)} y="56" width={xFor(0) - xFor(30)} height="54" rx="18" fill="#c7d2fe" />
-          <text x={(xFor(30) + xFor(0)) / 2} y="86" textAnchor="middle" fontSize="13" fontWeight="800" fill="#312e81">バトンゾーン 30m</text>
+          <text x={(xFor(30) + xFor(0)) / 2} y="86" textAnchor="middle" fontSize="13" fontWeight="800" fill="#312e81">{isEn ? "30 m exchange zone" : "バトンゾーン 30m"}</text>
           <line x1={xFor(40)} y1="126" x2={xFor(-5)} y2="126" stroke="#334155" strokeWidth="3" strokeLinecap="round" />
           {markers.map((distance) => {
             const x = xFor(distance);
@@ -696,18 +697,18 @@ function BatonMarkerGuide() {
           <g>
             <line x1={startX} y1="38" x2={startX} y2="142" stroke="#0f172a" strokeWidth="3" strokeDasharray="5 5" />
             <rect x={startX - 42} y="18" width="84" height="24" rx="12" fill="#0f172a" />
-            <text x={startX} y="35" textAnchor="middle" fontSize="10" fontWeight="800" fill="#ffffff">スタートマーク</text>
+            <text x={startX} y="35" textAnchor="middle" fontSize="10" fontWeight="800" fill="#ffffff">{isEn ? "Start mark" : "スタートマーク"}</text>
           </g>
           <path d="M190 202 L190 152" stroke="#0f172a" strokeWidth="2" strokeDasharray="5 5" />
           <path d={`M190 202 L${xFor(40)} 126`} stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 5" />
           <path d={`M190 202 L${xFor(-5)} 126`} stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 5" />
           <rect x="145" y="198" width="90" height="26" rx="13" fill="#0f172a" />
-          <text x="190" y="216" textAnchor="middle" fontSize="11" fontWeight="800" fill="#ffffff">撮影位置</text>
-          <text x="190" y="238" textAnchor="middle" fontSize="10" fontWeight="700" fill="#475569">40m区間の中央付近</text>
-          <text x={xFor(0)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">ゾーン入口</text>
-          <text x={xFor(30)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">ゾーン出口</text>
-          <text x="40" y="28" textAnchor="start" fontSize="10" fontWeight="700" fill="#475569">40m側</text>
-          <text x="340" y="28" textAnchor="end" fontSize="10" fontWeight="700" fill="#475569">-5m側</text>
+          <text x="190" y="216" textAnchor="middle" fontSize="11" fontWeight="800" fill="#ffffff">{isEn ? "Camera position" : "撮影位置"}</text>
+          <text x="190" y="238" textAnchor="middle" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "Near midpoint of 40 m section" : "40m区間の中央付近"}</text>
+          <text x={xFor(0)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">{isEn ? "Zone entry" : "ゾーン入口"}</text>
+          <text x={xFor(30)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">{isEn ? "Zone exit" : "ゾーン出口"}</text>
+          <text x="40" y="28" textAnchor="start" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "40 m side" : "40m側"}</text>
+          <text x="340" y="28" textAnchor="end" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "-5 m side" : "-5m側"}</text>
         </svg>
       </div>
       <ul className="mt-3 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-500">
@@ -731,7 +732,8 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mime });
 }
 
-export default function RelayBatonAnalyzerPrototype() {
+export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
+  const isEn = language === "en";
   const videoRef = useRef(null);
   const passPreviewRef = useRef(null);
   const selectionSectionRef = useRef(null);
@@ -752,6 +754,24 @@ export default function RelayBatonAnalyzerPrototype() {
   const [shareStatus, setShareStatus] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const appUrl = useMemo(() => (typeof window === "undefined" ? "" : new URL("/", window.location.href).toString()), []);
+  const translateResultLabel = (label) => {
+    if (!isEn) return label;
+    const map = {
+      "ぴったし": "Perfect",
+      "少し早い": "Slightly early",
+      "早い": "Early",
+      "かなり早い": "Very early",
+      "少し遅い": "Slightly late",
+      "遅い": "Late",
+      "かなり遅い": "Very late",
+      "極めてスムーズ": "Extremely smooth",
+      "スムーズ": "Smooth",
+      "少しもたつき": "Slightly delayed",
+      "かなりもたつき": "Very delayed",
+      "判定不可": "Unavailable",
+    };
+    return map[label] || label;
+  };
 
   useEffect(() => { runSelfTests(); }, []);
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
@@ -1113,7 +1133,13 @@ export default function RelayBatonAnalyzerPrototype() {
       }
     };
     const drawGraphLegend = (x, y, maxWidth = 980) => {
-      const items = [
+      const items = isEn ? [
+        { type: "line", color: "#ef4444", text: "Giver" },
+        { type: "line", color: "#2563eb", text: "Receiver" },
+        { type: "vline", color: "#16a34a", text: "Hand Raise" },
+        { type: "vline", color: "#f97316", text: "Completion" },
+        { type: "vline", color: "#a855f7", text: "Speed intersection" },
+      ] : [
         { type: "line", color: "#ef4444", text: "渡し手" },
         { type: "line", color: "#2563eb", text: "受け手" },
         { type: "vline", color: "#16a34a", text: "挙手位置" },
@@ -1193,8 +1219,8 @@ export default function RelayBatonAnalyzerPrototype() {
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawText("バトンパス分析結果", 60, 82, 54, 800, "#0f172a");
-    drawText(`日付: ${form.date || "--"} / 走順: ${form.leg || "--"} / 受け手: ${form.receiver || "--"} / 渡し手: ${form.giver || "--"} / 試技: ${form.attempt || "--"} / 足長: ${Number.isFinite(result.footLength) ? (result.footLength * 100).toFixed(1) + " cm" : "--"}`, 62, 130, 24, 500, "#475569");
+    drawText(isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", 60, 82, 54, 800, "#0f172a");
+    drawText(`${isEn ? "Date" : "日付"}: ${form.date || "--"} / ${isEn ? "Leg" : "走順"}: ${form.leg || "--"} / ${isEn ? "Receiver" : "受け手"}: ${form.receiver || "--"} / ${isEn ? "Giver" : "渡し手"}: ${form.giver || "--"} / ${isEn ? "Attempt" : "試技"}: ${form.attempt || "--"} / ${isEn ? "Foot length" : "足長"}: ${Number.isFinite(result.footLength) ? (result.footLength * 100).toFixed(1) + " cm" : "--"}`, 62, 130, 24, 500, "#475569");
 
     if (qrDataUrl) {
       try {
@@ -1206,21 +1232,21 @@ export default function RelayBatonAnalyzerPrototype() {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.drawImage(qr, 1440, 40, 120, 120);
-        drawText("このアプリへアクセス", 1582, 94, 26, 700, "#475569");
-        drawText("QRコード", 1650, 132, 24, 700, "#475569");
+        drawText(isEn ? "Open this app" : "このアプリへアクセス", 1582, 94, 26, 700, "#475569");
+        drawText(isEn ? "QR code" : "QRコード", 1650, 132, 24, 700, "#475569");
       } catch (_error) {}
     }
 
-    drawCard(60, 170, 390, 120, "30mバトンタイム", fmt(result.baton30Time), "s", true);
-    drawCard(470, 170, 390, 120, "40mバトンタイム", fmt(result.baton40Time), "s", true);
-    drawCard(880, 170, 390, 120, "挙手から完了時間", fmt(result.handToPassTime), "s");
-    drawCard(1290, 170, 390, 120, "バトン完了位置", fmt(result.passDistance), "m");
+    drawCard(60, 170, 390, 120, (isEn ? "30 m baton time" : "30mバトンタイム"), fmt(result.baton30Time), "s", true);
+    drawCard(470, 170, 390, 120, (isEn ? "40 m baton time" : "40mバトンタイム"), fmt(result.baton40Time), "s", true);
+    drawCard(880, 170, 390, 120, (isEn ? "Hand Raise to Pass Completion Time" : "挙手から完了時間"), fmt(result.handToPassTime), "s");
+    drawCard(1290, 170, 390, 120, (isEn ? "Pass completion position" : "バトン完了位置"), fmt(result.passDistance), "m");
 
-    drawText("バトンパス瞬間", 60, 340, 30, 800, "#0f172a");
+    drawText((isEn ? "Baton exchange moment" : "バトンパス瞬間"), 60, 340, 30, 800, "#0f172a");
     if (passMomentDataUrl) {
       const passMomentImg = await loadImage(passMomentDataUrl);
       drawImageContain(passMomentImg, 60, 364, 620, 400, "#ffffff");
-      if (Number.isFinite(passMomentFrame)) drawText(`コマ: ${passMomentFrame}`, 84, 746, 18, 700, "#475569");
+      if (Number.isFinite(passMomentFrame)) drawText(`${isEn ? "Frame" : "コマ"}: ${passMomentFrame}`, 84, 746, 18, 700, "#475569");
     } else {
       drawRoundRect(60, 364, 620, 400, 20);
       ctx.fillStyle = "#f8fafc";
@@ -1228,34 +1254,42 @@ export default function RelayBatonAnalyzerPrototype() {
       ctx.strokeStyle = "#e2e8f0";
       ctx.lineWidth = 2;
       ctx.stroke();
-      drawText("動画と挙手/完了コマを設定すると表示されます", 98, 574, 24, 700, "#94a3b8");
+      drawText(isEn ? "Set the video and hand raise/pass frames to display this image" : "動画と挙手/完了コマを設定すると表示されます", 98, 574, 24, 700, "#94a3b8");
     }
 
     const passSmoothness = classifyPassSmoothness(result.handToPassDistance);
-    drawSimpleGauge(60, 812, 620, "受け渡し評価", passSmoothness.label, passGaugePosition(result.handToPassDistance), [
+    drawSimpleGauge(60, 812, 620, (isEn ? "Pass Smoothness" : "受け渡し評価"), translateResultLabel(passSmoothness.label), passGaugePosition(result.handToPassDistance), [
       { width: 0.20, color: "#86efac" },
       { width: 0.30, color: "#bae6fd" },
       { width: 0.22, color: "#fde68a" },
       { width: 0.28, color: "#fecdd3" },
-    ], [
+    ], isEn ? [
+      { pos: 0.10, text: "Smooth" },
+      { pos: 0.50, text: "Slight delay" },
+      { pos: 0.86, text: "Delayed" },
+    ] : [
       { pos: 0.10, text: "スムーズ" },
       { pos: 0.50, text: "少しもたつき" },
       { pos: 0.86, text: "もたつき" },
     ]);
 
-    drawSimpleGauge(60, 948, 620, "出のタイミング評価", timing.label, startGaugePosition(result.startTiming), [
+    drawSimpleGauge(60, 948, 620, (isEn ? "Start Timing" : "出のタイミング評価"), translateResultLabel(timing.label), startGaugePosition(result.startTiming), [
       { width: 0.28, color: "#c7d2fe" },
       { width: 0.16, color: "#bae6fd" },
       { width: 0.14, color: "#86efac" },
       { width: 0.14, color: "#fde68a" },
       { width: 0.28, color: "#fecdd3" },
-    ], [
+    ], isEn ? [
+      { pos: 0.10, text: "Early" },
+      { pos: 0.51, text: "Perfect" },
+      { pos: 0.90, text: "Late" },
+    ] : [
       { pos: 0.10, text: "早い" },
       { pos: 0.51, text: "ぴったし" },
       { pos: 0.90, text: "遅い" },
     ]);
 
-    drawText("渡し手・受け手速度比較", 720, 340, 30, 800, "#0f172a");
+    drawText((isEn ? "Giver and receiver speed comparison" : "渡し手・受け手速度比較"), 720, 340, 30, 800, "#0f172a");
     if (graphCanvas) {
       drawImageContain(graphCanvas, 720, 364, 1020, 720, "#ffffff");
       drawGraphLegend(730, 1096, 1000);
@@ -1268,10 +1302,17 @@ export default function RelayBatonAnalyzerPrototype() {
     });
   };
 
-  const buildShareText = () => `バトンパス分析アプリで分析したよ。
+  const buildShareText = () => isEn
+    ? `I analyzed our baton exchange with the Baton Exchange Analysis app.
+30 m baton time: ${fmt(result.baton30Time)} s
+40 m baton time: ${fmt(result.baton40Time)} s
+Hand Raise to Pass Completion Time: ${fmt(result.handToPassTime)} s
+Pass completion position: ${fmt(result.passDistance, 2)} m
+App link: ${appUrl}`
+    : `バトンパス分析アプリで分析したよ。
 30mバトンタイム: ${fmt(result.baton30Time)} s
 40mバトンタイム：${fmt(result.baton40Time)} s
-挙手時間：${fmt(result.handTime)} s
+挙手時間：${fmt(result.handToPassTime)} s
 バトンパス完了位置: ${fmt(result.passDistance, 2)} m
 ${appUrl}`;
 
@@ -1301,10 +1342,10 @@ ${appUrl}`;
       const blob = await captureResultBlob();
       const file = new File([blob], `baton-analysis-${new Date().toISOString().slice(0, 10)}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: "バトンパス分析結果", text, url: appUrl, files: [file] });
+        await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl, files: [file] });
         setShareStatus("共有メニューを開きました。");
       } else if (navigator.share) {
-        await navigator.share({ title: "バトンパス分析結果", text, url: appUrl });
+        await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl });
         setShareStatus("共有メニューを開きました。画像は必要に応じて別途保存してください。");
       } else {
         await navigator.clipboard.writeText(text);
@@ -1352,7 +1393,7 @@ ${appUrl}`;
             <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">未入力の場合は1.70mとして計算し、渡し手と受け手の平均身長を「手を伸ばし合った利得距離」として扱います。</p>
           </section>
 
-          <BatonMarkerGuide />
+          <BatonMarkerGuide language={language} />
 
           <section className="no-capture mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
             <div className="mb-3 flex items-center gap-2"><Upload className="h-4 w-4 text-slate-500" /><h2 className="text-sm font-bold text-slate-700">動画アップロード</h2></div>
