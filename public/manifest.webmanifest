@@ -1,0 +1,37 @@
+{
+  "name": "Sprint Analyzer",
+  "short_name": "Sprint Analyzer",
+  "description": "Top speed and baton exchange analysis tools for sprint performance.",
+  "lang": "ja",
+  "start_url": "/?source=pwa#top-speed",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": [
+    "sports",
+    "utilities",
+    "health"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
