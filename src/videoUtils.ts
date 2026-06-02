@@ -414,7 +414,6 @@ export async function createSequenceStripImage(params: {
   const background = params.background ?? '#ffffff'
   const topCropPercent = params.topCropPercent ?? 0
   const bottomCropPercent = params.bottomCropPercent ?? 0
-
   if (images.length === 0) throw new Error('合成する連続写真がありません。')
 
   const loaded = await Promise.all(images.map((image) => loadImage(image.dataUrl)))
@@ -478,6 +477,7 @@ export async function createResultImage(params: {
   sequenceStripRow1DataUrl?: string
   sequenceStripRow2DataUrl?: string
   appUrl?: string
+  language?: 'ja' | 'en'
 }): Promise<string> {
   const width = 1800
   const headerHeight = 470
@@ -487,6 +487,10 @@ export async function createResultImage(params: {
   const footerHeight = 40
   const topCropPercent = params.topCropPercent ?? 0
   const bottomCropPercent = params.bottomCropPercent ?? 0
+  const language = params.language ?? 'ja'
+  const labels = language === 'en'
+    ? { title: 'Top Speed Analysis Result', dateMissing: 'No date', nameMissing: 'No name', marker: 'Marker distance', qr: 'Open app', topSpeed: 'Top speed', split: 'Marker split time', pitch: 'Pitch', stride: 'Stride', pred: 'Predicted 100 m time', rc: 'Right contact time', rf: 'Right flight time', lc: 'Left contact time', lf: 'Left flight time' }
+    : { title: 'トップスピード分析結果', dateMissing: '日付未入力', nameMissing: '名前未入力', marker: 'マーカー間距離', qr: 'Webアプリはこちら', topSpeed: 'トップスピード', split: 'マーカー間通過タイム', pitch: 'ピッチ', stride: 'ストライド', pred: '100m予測タイム', rc: '右 接地時間', rf: '右 滞空時間', lc: '左 接地時間', lf: '左 滞空時間' }
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = headerHeight + imageHeight * 2 + rowGap + footerHeight
@@ -497,11 +501,11 @@ export async function createResultImage(params: {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#0f172a'
   ctx.font = '700 54px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-  ctx.fillText('トップスピード分析結果', 56, 78)
+  ctx.fillText(labels.title, 56, 78)
 
   ctx.font = '400 28px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
   ctx.fillStyle = '#475569'
-  ctx.fillText(`${params.date || '日付未入力'} / ${params.athleteName || '名前未入力'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / マーカー間距離 ${formatNumber(params.distanceM, 2)} m`, 58, 124)
+  ctx.fillText(`${params.date || labels.dateMissing} / ${params.athleteName || labels.nameMissing} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / ${labels.marker} ${formatNumber(params.distanceM, 2)} m`, 58, 124)
 
   if (params.appUrl) {
     const qrDataUrl = await QRCode.toDataURL(params.appUrl, { margin: 1, width: 120 })
@@ -509,19 +513,19 @@ export async function createResultImage(params: {
     ctx.drawImage(qrImage, width - 168, 28, 104, 104)
     ctx.fillStyle = '#334155'
     ctx.font = '600 16px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('Webアプリはこちら', width - 180, 150)
+    ctx.fillText(labels.qr, width - 180, 150)
   }
 
   const metrics = [
-    { label: 'トップスピード', value: `${formatNumber(params.topSpeed, 2)} m/s`, big: true },
-    { label: 'マーカー間通過タイム', value: `${formatNumber(params.splitTime, 3)} s` },
-    { label: 'ピッチ', value: `${formatNumber(params.pitch, 2)} step/s` },
-    { label: 'ストライド', value: `${formatNumber(params.stride, 2)} m` },
-    { label: '100m予測タイム', value: `${formatNumber(params.predicted100m, 2)} s` },
-    { label: '右 接地時間', value: `${formatNumber(params.rightContactTime, 3)} s` },
-    { label: '右 滞空時間', value: `${formatNumber(params.rightFlightTime, 3)} s` },
-    { label: '左 接地時間', value: `${formatNumber(params.leftContactTime, 3)} s` },
-    { label: '左 滞空時間', value: `${formatNumber(params.leftFlightTime, 3)} s` },
+    { label: labels.topSpeed, value: `${formatNumber(params.topSpeed, 2)} m/s`, big: true },
+    { label: labels.split, value: `${formatNumber(params.splitTime, 3)} s` },
+    { label: labels.pitch, value: `${formatNumber(params.pitch, 2)} step/s` },
+    { label: labels.stride, value: `${formatNumber(params.stride, 2)} m` },
+    { label: labels.pred, value: `${formatNumber(params.predicted100m, 2)} s` },
+    { label: labels.rc, value: `${formatNumber(params.rightContactTime, 3)} s` },
+    { label: labels.rf, value: `${formatNumber(params.rightFlightTime, 3)} s` },
+    { label: labels.lc, value: `${formatNumber(params.leftContactTime, 3)} s` },
+    { label: labels.lf, value: `${formatNumber(params.leftFlightTime, 3)} s` },
   ]
 
   const cardW = 326

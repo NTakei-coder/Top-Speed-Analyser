@@ -731,7 +731,8 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mime });
 }
 
-export default function RelayBatonAnalyzerPrototype() {
+export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
+  const isEn = language === "en";
   const videoRef = useRef(null);
   const passPreviewRef = useRef(null);
   const selectionSectionRef = useRef(null);
@@ -1193,8 +1194,8 @@ export default function RelayBatonAnalyzerPrototype() {
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawText("バトンパス分析結果", 60, 82, 54, 800, "#0f172a");
-    drawText(`日付: ${form.date || "--"} / 走順: ${form.leg || "--"} / 受け手: ${form.receiver || "--"} / 渡し手: ${form.giver || "--"} / 試技: ${form.attempt || "--"} / 足長: ${Number.isFinite(result.footLength) ? (result.footLength * 100).toFixed(1) + " cm" : "--"}`, 62, 130, 24, 500, "#475569");
+    drawText(isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", 60, 82, 54, 800, "#0f172a");
+    drawText(`${isEn ? "Date" : "日付"}: ${form.date || "--"} / ${isEn ? "Leg" : "走順"}: ${form.leg || "--"} / ${isEn ? "Receiver" : "受け手"}: ${form.receiver || "--"} / ${isEn ? "Giver" : "渡し手"}: ${form.giver || "--"} / ${isEn ? "Attempt" : "試技"}: ${form.attempt || "--"} / ${isEn ? "Foot length" : "足長"}: ${Number.isFinite(result.footLength) ? (result.footLength * 100).toFixed(1) + " cm" : "--"}`, 62, 130, 24, 500, "#475569");
 
     if (qrDataUrl) {
       try {
@@ -1206,17 +1207,17 @@ export default function RelayBatonAnalyzerPrototype() {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.drawImage(qr, 1440, 40, 120, 120);
-        drawText("このアプリへアクセス", 1582, 94, 26, 700, "#475569");
-        drawText("QRコード", 1650, 132, 24, 700, "#475569");
+        drawText(isEn ? "Open this app" : "このアプリへアクセス", 1582, 94, 26, 700, "#475569");
+        drawText(isEn ? "QR code" : "QRコード", 1650, 132, 24, 700, "#475569");
       } catch (_error) {}
     }
 
-    drawCard(60, 170, 390, 120, "30mバトンタイム", fmt(result.baton30Time), "s", true);
-    drawCard(470, 170, 390, 120, "40mバトンタイム", fmt(result.baton40Time), "s", true);
-    drawCard(880, 170, 390, 120, "挙手から完了時間", fmt(result.handToPassTime), "s");
-    drawCard(1290, 170, 390, 120, "バトン完了位置", fmt(result.passDistance), "m");
+    drawCard(60, 170, 390, 120, (isEn ? "30 m baton time" : "30mバトンタイム"), fmt(result.baton30Time), "s", true);
+    drawCard(470, 170, 390, 120, (isEn ? "40 m baton time" : "40mバトンタイム"), fmt(result.baton40Time), "s", true);
+    drawCard(880, 170, 390, 120, (isEn ? "Hand Raise to Pass Completion Time" : "挙手から完了時間"), fmt(result.handToPassTime), "s");
+    drawCard(1290, 170, 390, 120, (isEn ? "Pass completion position" : "バトン完了位置"), fmt(result.passDistance), "m");
 
-    drawText("バトンパス瞬間", 60, 340, 30, 800, "#0f172a");
+    drawText((isEn ? "Baton exchange moment" : "バトンパス瞬間"), 60, 340, 30, 800, "#0f172a");
     if (passMomentDataUrl) {
       const passMomentImg = await loadImage(passMomentDataUrl);
       drawImageContain(passMomentImg, 60, 364, 620, 400, "#ffffff");
@@ -1232,7 +1233,7 @@ export default function RelayBatonAnalyzerPrototype() {
     }
 
     const passSmoothness = classifyPassSmoothness(result.handToPassDistance);
-    drawSimpleGauge(60, 812, 620, "受け渡し評価", passSmoothness.label, passGaugePosition(result.handToPassDistance), [
+    drawSimpleGauge(60, 812, 620, (isEn ? "Pass Smoothness" : "受け渡し評価"), passSmoothness.label, passGaugePosition(result.handToPassDistance), [
       { width: 0.20, color: "#86efac" },
       { width: 0.30, color: "#bae6fd" },
       { width: 0.22, color: "#fde68a" },
@@ -1243,7 +1244,7 @@ export default function RelayBatonAnalyzerPrototype() {
       { pos: 0.86, text: "もたつき" },
     ]);
 
-    drawSimpleGauge(60, 948, 620, "出のタイミング評価", timing.label, startGaugePosition(result.startTiming), [
+    drawSimpleGauge(60, 948, 620, (isEn ? "Start Timing" : "出のタイミング評価"), timing.label, startGaugePosition(result.startTiming), [
       { width: 0.28, color: "#c7d2fe" },
       { width: 0.16, color: "#bae6fd" },
       { width: 0.14, color: "#86efac" },
@@ -1255,7 +1256,7 @@ export default function RelayBatonAnalyzerPrototype() {
       { pos: 0.90, text: "遅い" },
     ]);
 
-    drawText("渡し手・受け手速度比較", 720, 340, 30, 800, "#0f172a");
+    drawText((isEn ? "Giver and receiver speed comparison" : "渡し手・受け手速度比較"), 720, 340, 30, 800, "#0f172a");
     if (graphCanvas) {
       drawImageContain(graphCanvas, 720, 364, 1020, 720, "#ffffff");
       drawGraphLegend(730, 1096, 1000);
@@ -1268,10 +1269,17 @@ export default function RelayBatonAnalyzerPrototype() {
     });
   };
 
-  const buildShareText = () => `バトンパス分析アプリで分析したよ。
+  const buildShareText = () => isEn
+    ? `I analyzed our baton exchange with the Baton Exchange Analysis app.
+30 m baton time: ${fmt(result.baton30Time)} s
+40 m baton time: ${fmt(result.baton40Time)} s
+Hand Raise to Pass Completion Time: ${fmt(result.handToPassTime)} s
+Pass completion position: ${fmt(result.passDistance, 2)} m
+App link: ${appUrl}`
+    : `バトンパス分析アプリで分析したよ。
 30mバトンタイム: ${fmt(result.baton30Time)} s
 40mバトンタイム：${fmt(result.baton40Time)} s
-挙手時間：${fmt(result.handTime)} s
+挙手時間：${fmt(result.handToPassTime)} s
 バトンパス完了位置: ${fmt(result.passDistance, 2)} m
 ${appUrl}`;
 
@@ -1301,10 +1309,10 @@ ${appUrl}`;
       const blob = await captureResultBlob();
       const file = new File([blob], `baton-analysis-${new Date().toISOString().slice(0, 10)}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: "バトンパス分析結果", text, url: appUrl, files: [file] });
+        await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl, files: [file] });
         setShareStatus("共有メニューを開きました。");
       } else if (navigator.share) {
-        await navigator.share({ title: "バトンパス分析結果", text, url: appUrl });
+        await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl });
         setShareStatus("共有メニューを開きました。画像は必要に応じて別途保存してください。");
       } else {
         await navigator.clipboard.writeText(text);

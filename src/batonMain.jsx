@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import BatonAnalyzer from "./BatonAnalyzer.jsx";
 import "./batonStyle.css";
+import { getInitialLanguage, installStaticTranslator, saveLanguage, ui } from "./i18n";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -27,10 +29,26 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function BatonRoot() {
+  const [language] = useState(getInitialLanguage)
+  useEffect(() => {
+    saveLanguage(language)
+    return installStaticTranslator(language)
+  }, [language])
+
+  return (
+    <>
+      <div className="baton-language-note" aria-label={ui[language].language}>{language === "en" ? "English" : "日本語"}</div>
+      <ErrorBoundary>
+        <BatonAnalyzer language={language} />
+      </ErrorBoundary>
+      <Analytics />
+    </>
+  )
+}
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <BatonAnalyzer />
-    </ErrorBoundary>
+    <BatonRoot />
   </React.StrictMode>,
 );

@@ -16,6 +16,7 @@ import {
   seekVideo,
 } from './videoUtils'
 import markerGuideImage from './marker-guide.png'
+import { ui, type Language } from './i18n'
 
 const FRAME_STEPS: FrameStep[] = [
   { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
@@ -109,7 +110,8 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime })
 }
 
-function App() {
+function App({ language = 'ja' }: { language?: Language }) {
+  const topText = ui[language]
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
 
@@ -141,7 +143,7 @@ function App() {
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
   const currentTrimImage = sequenceImages[trimIndex] ?? null
-  const sexLabel = athlete.sex === 'male' ? '男性' : '女性'
+  const sexLabel = athlete.sex === 'male' ? (language === 'en' ? 'Male' : '男性') : (language === 'en' ? 'Female' : '女性')
   const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
 
   const result = useMemo(() => {
@@ -405,6 +407,7 @@ function App() {
       sequenceStripRow1DataUrl: row1StripDataUrl,
       sequenceStripRow2DataUrl: row2StripDataUrl,
       appUrl: window.location.origin + window.location.pathname,
+      language,
     })
   }
 
@@ -425,13 +428,23 @@ function App() {
   const shareResult = async () => {
     const appUrl = window.location.origin + window.location.pathname
     const shareText = result
-      ? `トップスピード分析アプリで分析したよ。
+      ? language === 'en'
+        ? `${topText.topSpeedShareIntro}
+Top speed: ${formatNumber(result.topSpeed, 2)} m/s
+Pitch: ${formatNumber(result.pitch, 2)} step/s
+Stride: ${formatNumber(result.stride, 2)} m
+Predicted 100 m time: ${formatNumber(result.predicted100m, 2)} s
+${topText.appLink}: ${appUrl}`
+        : `${topText.topSpeedShareIntro}
 トップスピード: ${formatNumber(result.topSpeed, 2)} m/s
 ピッチ：${formatNumber(result.pitch, 2)} step/s
 ストライド：${formatNumber(result.stride, 2)} m
 100m予測タイム: ${formatNumber(result.predicted100m, 2)} s
 ${appUrl}`
-      : `トップスピード分析アプリで分析できます。
+      : language === 'en'
+        ? `Analyze your sprint with the Top Speed Analysis app.
+${topText.appLink}: ${appUrl}`
+        : `トップスピード分析アプリで分析できます。
 ${appUrl}`
 
     setIsWorking(true)
@@ -440,13 +453,13 @@ ${appUrl}`
         const dataUrl = await createTopSpeedResultDataUrl()
         const file = new File([dataUrlToBlob(dataUrl)], `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`, { type: 'image/png' })
         if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ title: 'トップスピード分析結果', text: shareText, url: appUrl, files: [file] })
+          await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl, files: [file] })
           setMessage('共有メニューを開きました。')
           return
         }
       }
       if (navigator.share) {
-        await navigator.share({ title: 'トップスピード分析結果', text: shareText, url: appUrl })
+        await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl })
         setMessage('共有メニューを開きました。画像は必要に応じて別途保存してください。')
       } else {
         await navigator.clipboard.writeText(shareText)
@@ -465,9 +478,9 @@ ${appUrl}`
       <section className="hero">
         <div>
           <p className="eyebrow">Top Speed Analyzer</p>
-          <h1>トップスピード分析</h1>
+          <h1>{topText.topSpeedTitle}</h1>
           <p className="hero-copy">
-            動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。
+            {language === 'en' ? 'Analyze sprint video in the browser and calculate top speed, pitch, stride, bilateral contact/flight times, and predicted 100 m time.' : '動画をブラウザ内で解析し、トップスピード・ピッチ・ストライド・左右の接地時間／滞空時間・100m予測タイムを算出します。'}
           </p>
         </div>
       </section>
