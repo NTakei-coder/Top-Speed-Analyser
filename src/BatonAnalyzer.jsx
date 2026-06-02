@@ -74,25 +74,60 @@ const DEFAULT_STATE = {
 };
 
 const SELECTION_TASKS = [
-  { type: "form", key: "startFrame", label: "動き出しコマ", help: "受け手のつま先が地面から離れた瞬間のコマを選択してください。動画をコマ送りし、該当コマで赤チェックボタンを押してください。" },
-  { type: "form", key: "markFrame", label: "渡し手マーク通過コマ", help: "渡し手がスタートマーク(テープ位置)を通過する瞬間のコマを選択してください。注意: テープ位置が映像からわかるようにマーカーを事前に置いてください。" },
-  { type: "frame", key: "giverMinus5", label: "渡し手 -5m 通過コマ", help: "渡し手がバトンゾーン入り口を0mとした時に、-5m地点を通過する瞬間のコマを選択してください。注意: 映像から5mごとに位置がわかるように事前にマークを置いてください。" },
-  { type: "frame", key: "giver0", label: "渡し手 0m 通過コマ", help: "渡し手がバトンゾーン入り口（0m地点）を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver5", label: "受け手 5m 通過コマ", help: "受け手が 5m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "giver5", label: "渡し手 5m 通過コマ", help: "渡し手が 5m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver10", label: "受け手 10m 通過コマ", help: "受け手が 10m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "giver10", label: "渡し手 10m 通過コマ", help: "渡し手が 10m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver15", label: "受け手 15m 通過コマ", help: "受け手が 15m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "giver15", label: "渡し手 15m 通過コマ", help: "渡し手が 15m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver20", label: "受け手 20m 通過コマ", help: "受け手が 20m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "giver20", label: "渡し手 20m 通過コマ", help: "渡し手が 20m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver25", label: "受け手 25m 通過コマ", help: "受け手が 25m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "giver25", label: "渡し手 25m 通過コマ", help: "渡し手が 25m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver30", label: "受け手 30m 通過コマ", help: "受け手がバトンゾーン出口（30m地点）を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver35", label: "受け手 35m 通過コマ", help: "受け手が 35m 地点を通過するコマを選択してください。" },
-  { type: "frame", key: "receiver40", label: "受け手 40m 通過コマ", help: "受け手がバトンゾーン出口から10m先（40m地点）を通過するコマを選択してください。" },
-  { type: "form", key: "handFrame", label: "挙手コマ", help: "受け手の手がバトンパスを受ける高さに固定された最初のコマを選択してください。" },
-  { type: "form", key: "passFrame", label: "バトンパス完了コマ", help: "バトンが受け手に渡り、渡し手の手が離れた瞬間のコマを選択してください。" },
+  {
+    type: "form",
+    key: "startFrame",
+    label: "動き出しコマ",
+    labelEn: "Start Frame",
+    help: "受け手のつま先が地面から離れた瞬間のコマを選択してください。動画をコマ送りし、該当コマで赤チェックボタンを押してください。",
+    helpEn: "Select the frame where the receiver's toe leaves the ground. Step through the video frame by frame, then press the red check button on the target frame.",
+  },
+  {
+    type: "form",
+    key: "markFrame",
+    label: "渡し手マーク通過コマ",
+    labelEn: "Giver Start Mark Pass Frame",
+    help: "渡し手がスタートマーク(テープ位置)を通過する瞬間のコマを選択してください。注意: テープ位置が映像からわかるようにマーカーを事前に置いてください。",
+    helpEn: "Select the frame where the giver passes the start mark (tape position). Note: place a marker in advance so the tape position is visible in the video.",
+  },
+  {
+    type: "frame",
+    key: "giverMinus5",
+    label: "渡し手 -5m 通過コマ",
+    labelEn: "Giver -5 m Pass Frame",
+    help: "渡し手がバトンゾーン入り口を0mとした時に、-5m地点を通過する瞬間のコマを選択してください。注意: 映像から5mごとに位置がわかるように事前にマークを置いてください。",
+    helpEn: "Select the frame where the giver passes the -5 m point, with the baton-zone entrance defined as 0 m. Note: place markers in advance so each 5 m position is visible in the video.",
+  },
+  { type: "frame", key: "giver0", label: "渡し手 0m 通過コマ", labelEn: "Giver 0 m Pass Frame", help: "渡し手がバトンゾーン入り口（0m地点）を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the baton-zone entrance (0 m point)." },
+  { type: "frame", key: "receiver5", label: "受け手 5m 通過コマ", labelEn: "Receiver 5 m Pass Frame", help: "受け手が 5m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 5 m point." },
+  { type: "frame", key: "giver5", label: "渡し手 5m 通過コマ", labelEn: "Giver 5 m Pass Frame", help: "渡し手が 5m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the 5 m point." },
+  { type: "frame", key: "receiver10", label: "受け手 10m 通過コマ", labelEn: "Receiver 10 m Pass Frame", help: "受け手が 10m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 10 m point." },
+  { type: "frame", key: "giver10", label: "渡し手 10m 通過コマ", labelEn: "Giver 10 m Pass Frame", help: "渡し手が 10m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the 10 m point." },
+  { type: "frame", key: "receiver15", label: "受け手 15m 通過コマ", labelEn: "Receiver 15 m Pass Frame", help: "受け手が 15m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 15 m point." },
+  { type: "frame", key: "giver15", label: "渡し手 15m 通過コマ", labelEn: "Giver 15 m Pass Frame", help: "渡し手が 15m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the 15 m point." },
+  { type: "frame", key: "receiver20", label: "受け手 20m 通過コマ", labelEn: "Receiver 20 m Pass Frame", help: "受け手が 20m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 20 m point." },
+  { type: "frame", key: "giver20", label: "渡し手 20m 通過コマ", labelEn: "Giver 20 m Pass Frame", help: "渡し手が 20m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the 20 m point." },
+  { type: "frame", key: "receiver25", label: "受け手 25m 通過コマ", labelEn: "Receiver 25 m Pass Frame", help: "受け手が 25m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 25 m point." },
+  { type: "frame", key: "giver25", label: "渡し手 25m 通過コマ", labelEn: "Giver 25 m Pass Frame", help: "渡し手が 25m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the giver passes the 25 m point." },
+  { type: "frame", key: "receiver30", label: "受け手 30m 通過コマ", labelEn: "Receiver 30 m Pass Frame", help: "受け手がバトンゾーン出口（30m地点）を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the baton-zone exit (30 m point)." },
+  { type: "frame", key: "receiver35", label: "受け手 35m 通過コマ", labelEn: "Receiver 35 m Pass Frame", help: "受け手が 35m 地点を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes the 35 m point." },
+  { type: "frame", key: "receiver40", label: "受け手 40m 通過コマ", labelEn: "Receiver 40 m Pass Frame", help: "受け手がバトンゾーン出口から10m先（40m地点）を通過するコマを選択してください。", helpEn: "Select the frame where the receiver passes 10 m beyond the baton-zone exit (40 m point)." },
+  {
+    type: "form",
+    key: "handFrame",
+    label: "挙手コマ",
+    labelEn: "Hand Raise Frame",
+    help: "受け手の手がバトンパスを受ける高さに固定された最初のコマを選択してください。",
+    helpEn: "Select the first frame where the receiver's hand is fixed at the height for receiving the baton.",
+  },
+  {
+    type: "form",
+    key: "passFrame",
+    label: "バトンパス完了コマ",
+    labelEn: "Baton Pass Completion Frame",
+    help: "バトンが受け手に渡り、渡し手の手が離れた瞬間のコマを選択してください。",
+    helpEn: "Select the frame where the baton has been transferred to the receiver and the giver's hand has released it.",
+  },
 ];
 
 const FRAME_FIELDS = SELECTION_TASKS.filter((task) => task.type === "frame");
@@ -1384,8 +1419,8 @@ ${appUrl}`;
               <video ref={videoRef} src={videoUrl} playsInline className="w-full rounded-2xl bg-black" onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration); setCurrentTime(event.currentTarget.currentTime || 0); estimateFps(); }} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onSeeked={(event) => setCurrentTime(event.currentTarget.currentTime)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
               <div className={`mt-3 relay-instruction-card ${taskIndex % 2 === 0 ? "relay-odd-step" : "relay-even-step"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-black opacity-80">次に選択するコマ</p><p className="rounded-full bg-white/70 px-3 py-1 text-xs font-bold">{taskIndex + 1} / {SELECTION_TASKS.length}</p></div>
-                <h3 className="text-xl font-black">{activeTask.label}</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 opacity-90">{activeTask.help}</p>
+                <h3 className="text-xl font-black">{isEn ? activeTask.labelEn : activeTask.label}</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 opacity-90">{isEn ? activeTask.helpEn : activeTask.help}</p>
                 <p className="mt-2 text-xs font-bold opacity-80">現在値: {getTaskValue(activeTask) || "未選択"}</p>
               </div>
               <div className="mt-3">
@@ -1551,7 +1586,7 @@ ${appUrl}`;
               <Field label="動き出し（受け手つま先離地）" value={form.startFrame} onChange={(value) => setField("startFrame", value)} unit="frame" inputMode="decimal" />
               <Field label="挙手（受ける姿勢で静止）" value={form.handFrame} onChange={(value) => setField("handFrame", value)} unit="frame" inputMode="decimal" />
               <Field label="パス完了" value={form.passFrame} onChange={(value) => setField("passFrame", value)} unit="frame" inputMode="decimal" />
-              {FRAME_FIELDS.map((field) => <Field key={field.key} label={field.label.replace(" 通過コマ", "")} value={form.frames[field.key]} onChange={(value) => setFrame(field.key, value)} unit="frame" inputMode="decimal" />)}
+              {FRAME_FIELDS.map((field) => <Field key={field.key} label={isEn ? field.labelEn.replace(" Pass Frame", "") : field.label.replace(" 通過コマ", "")} value={form.frames[field.key]} onChange={(value) => setFrame(field.key, value)} unit="frame" inputMode="decimal" />)}
             </div>
             <button onClick={reset} className="no-capture mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 shadow-sm active:scale-[0.99]"><RotateCcw className="h-4 w-4" />リセット</button>
           </section>

@@ -19,6 +19,8 @@ export interface FrameStep {
   key: FrameKey
   label: string
   shortLabel: string
+  labelEn: string
+  shortLabelEn: string
 }
 
 export interface AthleteInfo {

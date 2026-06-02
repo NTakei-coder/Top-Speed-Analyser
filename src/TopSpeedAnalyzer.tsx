@@ -18,17 +18,83 @@ import {
 import { ui, type Language } from './i18n'
 
 const FRAME_STEPS: FrameStep[] = [
-  { key: 'marker1', label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください', shortLabel: '0m通過' },
-  { key: 'td1', label: '1歩目が着地する瞬間を選択してください', shortLabel: '1歩目着地' },
-  { key: 'to1', label: '1歩目が離地する瞬間を選択してください', shortLabel: '1歩目離地' },
-  { key: 'td2', label: '2歩目が着地する瞬間を選択してください', shortLabel: '2歩目着地' },
-  { key: 'to2', label: '2歩目が離地する瞬間を選択してください', shortLabel: '2歩目離地' },
-  { key: 'td3', label: '3歩目が着地する瞬間を選択してください', shortLabel: '3歩目着地' },
-  { key: 'to3', label: '3歩目が離地する瞬間を選択してください', shortLabel: '3歩目離地' },
-  { key: 'td4', label: '4歩目が着地する瞬間を選択してください', shortLabel: '4歩目着地' },
-  { key: 'to4', label: '4歩目が離地する瞬間を選択してください', shortLabel: '4歩目離地' },
-  { key: 'td5', label: '5歩目が着地する瞬間を選択してください', shortLabel: '5歩目着地' },
-  { key: 'marker2', label: 'マーカー2、すなわちゴール地点を通過する瞬間を選択してください', shortLabel: 'ゴール通過' },
+  {
+    key: 'marker1',
+    label: 'マーカー1、すなわち0m地点を通過する瞬間を選択してください',
+    shortLabel: '0m通過',
+    labelEn: 'Select the frame where the runner passes Marker 1, i.e., the 0 m point.',
+    shortLabelEn: '0 m pass',
+  },
+  {
+    key: 'td1',
+    label: '1歩目が着地する瞬間を選択してください',
+    shortLabel: '1歩目着地',
+    labelEn: 'Select the frame where the 1st step touches down.',
+    shortLabelEn: '1st TD',
+  },
+  {
+    key: 'to1',
+    label: '1歩目が離地する瞬間を選択してください',
+    shortLabel: '1歩目離地',
+    labelEn: 'Select the frame where the 1st step takes off.',
+    shortLabelEn: '1st TO',
+  },
+  {
+    key: 'td2',
+    label: '2歩目が着地する瞬間を選択してください',
+    shortLabel: '2歩目着地',
+    labelEn: 'Select the frame where the 2nd step touches down.',
+    shortLabelEn: '2nd TD',
+  },
+  {
+    key: 'to2',
+    label: '2歩目が離地する瞬間を選択してください',
+    shortLabel: '2歩目離地',
+    labelEn: 'Select the frame where the 2nd step takes off.',
+    shortLabelEn: '2nd TO',
+  },
+  {
+    key: 'td3',
+    label: '3歩目が着地する瞬間を選択してください',
+    shortLabel: '3歩目着地',
+    labelEn: 'Select the frame where the 3rd step touches down.',
+    shortLabelEn: '3rd TD',
+  },
+  {
+    key: 'to3',
+    label: '3歩目が離地する瞬間を選択してください',
+    shortLabel: '3歩目離地',
+    labelEn: 'Select the frame where the 3rd step takes off.',
+    shortLabelEn: '3rd TO',
+  },
+  {
+    key: 'td4',
+    label: '4歩目が着地する瞬間を選択してください',
+    shortLabel: '4歩目着地',
+    labelEn: 'Select the frame where the 4th step touches down.',
+    shortLabelEn: '4th TD',
+  },
+  {
+    key: 'to4',
+    label: '4歩目が離地する瞬間を選択してください',
+    shortLabel: '4歩目離地',
+    labelEn: 'Select the frame where the 4th step takes off.',
+    shortLabelEn: '4th TO',
+  },
+  {
+    key: 'td5',
+    label: '5歩目が着地する瞬間を選択してください',
+    shortLabel: '5歩目着地',
+    labelEn: 'Select the frame where the 5th step touches down.',
+    shortLabelEn: '5th TD',
+  },
+  {
+    key: 'marker2',
+    label: 'マーカー2、すなわちゴール地点を通過する瞬間を選択してください',
+    shortLabel: 'ゴール通過',
+    labelEn: 'Select the frame where the runner passes Marker 2, i.e., the finish point.',
+    shortLabelEn: 'Finish pass',
+  },
 ]
 
 function quarterFrame(start: number, end: number, ratio: number): number {
@@ -150,6 +216,8 @@ function App({ language = 'ja' }: { language?: Language }) {
 
   const totalFrames = useMemo(() => Math.max(0, Math.floor(duration * fps)), [duration, fps])
   const currentStep = FRAME_STEPS[stepIndex]
+  const getStepLabel = (step: FrameStep) => language === 'en' ? step.labelEn : step.label
+  const getStepShortLabel = (step: FrameStep) => language === 'en' ? step.shortLabelEn : step.shortLabel
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
   const currentTrimImage = sequenceImages[trimIndex] ?? null
@@ -294,7 +362,7 @@ function App({ language = 'ja' }: { language?: Language }) {
         // ignore
       }
     }
-    setMessage(`${currentStep.shortLabel}：${currentFrame}フレームを登録しました。`)
+    setMessage(language === 'en' ? `${currentStep.shortLabelEn}: registered frame ${currentFrame}.` : `${currentStep.shortLabel}：${currentFrame}フレームを登録しました。`)
     setSequenceImages([])
     setSequenceStripUrl(null)
     setTrimIndex(0)
@@ -312,7 +380,7 @@ function App({ language = 'ja' }: { language?: Language }) {
     setSequenceStripUrl(null)
     setTrimIndex(0)
     setLastSequenceSignature('')
-    setMessage(`${previousStep.shortLabel}の登録を取り消しました。`)
+    setMessage(language === 'en' ? `Canceled ${previousStep.shortLabelEn}.` : `${previousStep.shortLabel}の登録を取り消しました。`)
   }
 
   const jumpToRegisteredFrame = async (key: FrameKey) => {
@@ -630,7 +698,7 @@ ${appUrl}`
 
           <div className="control-panel">
             <div className={`instruction ${stepIndex % 2 === 0 ? "odd-step" : "even-step"}`}>
-              {currentStep ? currentStep.label : 'すべてのフレーム登録が完了しました。'}
+              {currentStep ? getStepLabel(currentStep) : (language === 'en' ? 'All frames have been registered.' : 'すべてのフレーム登録が完了しました。')}
             </div>
 
             <label className="frame-slider-label">
@@ -665,7 +733,7 @@ ${appUrl}`
               onClick={() => void jumpToRegisteredFrame(step.key)}
               disabled={frames[step.key] === null}
             >
-              <span>{step.shortLabel}</span>
+              <span>{getStepShortLabel(step)}</span>
               <strong>{frames[step.key] ?? '-'}</strong>
             </button>
           ))}
