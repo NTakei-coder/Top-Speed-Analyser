@@ -1110,3 +1110,150 @@ video::-webkit-media-controls-start-playback-button {
   border-color: #94a3b8;
   color: #334155;
 }
+
+.icon-frame-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.icon-frame-controls button {
+  min-height: 64px;
+  padding: 0.42rem;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.icon-frame-controls button svg {
+  width: 36px;
+  height: 36px;
+  fill: currentColor;
+  display: block;
+}
+
+.icon-frame-controls .register-icon-button {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #ffffff;
+  transform: scale(1.04);
+}
+
+.icon-frame-controls.compact {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  gap: 4px;
+}
+
+.icon-frame-controls.compact button {
+  min-height: 30px;
+  padding: 0.12rem;
+  border-radius: 9px;
+}
+
+.icon-frame-controls.compact button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.analysis-switch-shell {
+  width: min(1180px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 18px 0 0;
+}
+
+.analysis-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+  padding: 8px;
+}
+
+.analysis-switch button {
+  min-height: 54px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  font-size: 1rem;
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.analysis-switch button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: #f8fafc;
+}
+
+.analysis-switch button.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.baton-analysis-frame {
+  display: block;
+  width: 100%;
+  min-height: 9000px;
+  border: 0;
+  background: #f8fafc;
+}
+
+@media (max-width: 560px) {
+  .analysis-switch-shell {
+    width: min(100% - 18px, 1180px);
+    padding-top: 10px;
+  }
+
+  .analysis-switch {
+    gap: 6px;
+    border-radius: 18px;
+    padding: 6px;
+  }
+
+  .analysis-switch button {
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+  }
+}
+
+
+/* v20 top-speed video and spacing refinements */
+.top-speed-video-panel {
+  min-height: 0 !important;
+  background: transparent !important;
+  display: block !important;
+  overflow: visible !important;
+}
+
+.top-speed-video-panel video {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+  background: #000000;
+  max-height: none;
+}
+
+.frame-slider-label {
+  margin-bottom: 12px;
+}
+
+.icon-frame-controls {
+  margin-top: 12px;
+}
+
+.undo-row {
+  margin-top: 14px;
+}
