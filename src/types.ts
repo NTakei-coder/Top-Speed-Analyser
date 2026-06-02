@@ -23,6 +23,7 @@ export interface FrameStep {
 
 export interface AthleteInfo {
   name: string
+  date: string
   heightCm: number
   sex: Sex
 }

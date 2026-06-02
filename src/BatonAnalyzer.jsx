@@ -1268,7 +1268,12 @@ export default function RelayBatonAnalyzerPrototype() {
     });
   };
 
-  const buildShareText = () => `バトンパス分析結果\n30mタイム: ${fmt(result.baton30Time)} s\n40mタイム: ${fmt(result.baton40Time)} s\n出のタイミング: ${fmt(result.startTiming)} s\nパス完了位置: ${fmt(result.passDistance, 2)} m\n${appUrl}`;
+  const buildShareText = () => `バトンパス分析アプリで分析したよ。
+30mバトンタイム: ${fmt(result.baton30Time)} s
+40mバトンタイム：${fmt(result.baton40Time)} s
+挙手時間：${fmt(result.handTime)} s
+バトンパス完了位置: ${fmt(result.passDistance, 2)} m
+${appUrl}`;
 
   const saveResultImage = async () => {
     try {

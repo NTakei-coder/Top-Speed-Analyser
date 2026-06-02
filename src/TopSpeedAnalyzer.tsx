@@ -113,7 +113,7 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
 
-  const [athlete, setAthlete] = useState<AthleteInfo>({ name: '', heightCm: 170, sex: 'male' })
+  const [athlete, setAthlete] = useState<AthleteInfo>({ name: '', date: new Date().toISOString().slice(0, 10), heightCm: 170, sex: 'male' })
   const [distanceM, setDistanceM] = useState(10)
   const [fps, setFps] = useState(120)
   const [fpsEstimateInfo, setFpsEstimateInfo] = useState('')
@@ -385,6 +385,7 @@ function App() {
     const row2StripDataUrl = await createSequenceStripImage({ sequenceImages: displayImages.slice(8), direction: 'ltr', targetHeight: 240, topCropPercent, bottomCropPercent })
     return await createResultImage({
       athleteName: athlete.name,
+      date: athlete.date,
       heightCm: athlete.heightCm,
       sexLabel,
       distanceM,
@@ -424,12 +425,13 @@ function App() {
   const shareResult = async () => {
     const appUrl = window.location.origin + window.location.pathname
     const shareText = result
-      ? `トップスピード分析結果
+      ? `トップスピード分析アプリで分析したよ。
 トップスピード: ${formatNumber(result.topSpeed, 2)} m/s
-ピッチ: ${formatNumber(result.pitch, 2)} step/s
-ストライド: ${formatNumber(result.stride, 2)} m
+ピッチ：${formatNumber(result.pitch, 2)} step/s
+ストライド：${formatNumber(result.stride, 2)} m
+100m予測タイム: ${formatNumber(result.predicted100m, 2)} s
 ${appUrl}`
-      : `Top Speed Analyzerでトップスピードを測定できます。
+      : `トップスピード分析アプリで分析できます。
 ${appUrl}`
 
     setIsWorking(true)
@@ -480,6 +482,10 @@ ${appUrl}`
             <label>
               ユーザー名
               <input value={athlete.name} onChange={(e) => updateAthlete('name', e.target.value)} />
+            </label>
+            <label>
+              日付
+              <input type="date" value={athlete.date} onChange={(e) => updateAthlete('date', e.target.value)} />
             </label>
             <label>
               身長 cm
@@ -660,7 +666,7 @@ ${appUrl}`
             <div className="section-header">
               <div>
                 <h2>分析結果</h2>
-                <p className="muted">{athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
+                <p className="muted">{athlete.date || '日付未入力'} / {athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
               </div>
             </div>
             <div className="result-grid">

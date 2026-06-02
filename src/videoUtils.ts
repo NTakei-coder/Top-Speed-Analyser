@@ -458,6 +458,7 @@ export async function createSequenceStripImage(params: {
 
 export async function createResultImage(params: {
   athleteName: string
+  date?: string
   heightCm: number
   sexLabel: string
   distanceM: number
@@ -500,7 +501,7 @@ export async function createResultImage(params: {
 
   ctx.font = '400 28px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
   ctx.fillStyle = '#475569'
-  ctx.fillText(`${params.athleteName || '名前未入力'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / マーカー間距離 ${formatNumber(params.distanceM, 2)} m`, 58, 124)
+  ctx.fillText(`${params.date || '日付未入力'} / ${params.athleteName || '名前未入力'} / ${formatNumber(params.heightCm, 0)} cm / ${params.sexLabel} / マーカー間距離 ${formatNumber(params.distanceM, 2)} m`, 58, 124)
 
   if (params.appUrl) {
     const qrDataUrl = await QRCode.toDataURL(params.appUrl, { margin: 1, width: 120 })
