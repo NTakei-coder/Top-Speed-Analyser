@@ -681,7 +681,7 @@ function BatonMarkerGuide({ language = "ja" } = {}) {
         <img
           src={isEn ? "/guides/baton-en.png" : "/guides/baton-ja.png"}
           alt={isEn ? "Baton exchange filming guide" : "バトンパス撮影ガイド"}
-          className="h-auto w-full rounded-2xl"
+          className="mx-auto h-auto w-full max-h-[360px] object-contain rounded-2xl md:max-h-[420px]"
         />
       </div>
 
