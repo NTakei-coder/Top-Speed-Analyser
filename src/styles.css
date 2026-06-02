@@ -1311,3 +1311,130 @@ video::-webkit-media-controls-start-playback-button {
     max-height: 240px;
   }
 }
+
+/* v34: Add-to-home-screen / PWA install card */
+.home-install-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin: 14px auto 14px;
+  padding: 16px;
+  max-width: 1120px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #eef2ff 0%, #fff7ed 100%);
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
+}
+
+.home-install-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  background: #0f172a;
+}
+
+.home-install-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.home-install-body {
+  min-width: 0;
+}
+
+.home-install-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-install-title-row h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.home-install-title-row span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.home-install-body p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.home-install-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.home-install-actions > button {
+  justify-self: start;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 900;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.22);
+}
+
+.home-install-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.home-install-steps div {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.home-install-steps strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 700px) {
+  .home-install-card {
+    grid-template-columns: 56px minmax(0, 1fr);
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .home-install-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+
+  .home-install-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .home-install-steps {
+    grid-template-columns: 1fr;
+  }
+}
