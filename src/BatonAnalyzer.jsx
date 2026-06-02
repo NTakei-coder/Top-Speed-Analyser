@@ -678,39 +678,13 @@ function BatonMarkerGuide({ language = "ja" } = {}) {
     <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
       <div className="mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-slate-500" /><h2 className="text-sm font-bold text-slate-700">{isEn ? "Marker setup and filming guide" : "マーカー設置・撮影方法"}</h2></div>
       <div className="overflow-hidden rounded-3xl border border-slate-100 bg-slate-50 p-3">
-        <svg viewBox="0 0 380 250" className="h-auto w-full" role="img" aria-label="バトンゾーンのマーカー設置図">
-          <rect x="22" y="56" width="336" height="54" rx="18" fill="#e2e8f0" />
-          <rect x={xFor(30)} y="56" width={xFor(0) - xFor(30)} height="54" rx="18" fill="#c7d2fe" />
-          <text x={(xFor(30) + xFor(0)) / 2} y="86" textAnchor="middle" fontSize="13" fontWeight="800" fill="#312e81">{isEn ? "30 m exchange zone" : "バトンゾーン 30m"}</text>
-          <line x1={xFor(40)} y1="126" x2={xFor(-5)} y2="126" stroke="#334155" strokeWidth="3" strokeLinecap="round" />
-          {markers.map((distance) => {
-            const x = xFor(distance);
-            const isZoneEdge = distance === 0 || distance === 30;
-            return (
-              <g key={distance}>
-                <line x1={x} y1="56" x2={x} y2="142" stroke={isZoneEdge ? "#ef4444" : "#64748b"} strokeWidth={isZoneEdge ? 3 : 2} opacity="0.9" />
-                <circle cx={x} cy="126" r={isZoneEdge ? 5 : 4} fill={isZoneEdge ? "#ef4444" : "#334155"} />
-                <text x={x} y="160" textAnchor="middle" fontSize="10" fontWeight="700" fill="#475569">{distance}m</text>
-              </g>
-            );
-          })}
-          <g>
-            <line x1={startX} y1="38" x2={startX} y2="142" stroke="#0f172a" strokeWidth="3" strokeDasharray="5 5" />
-            <rect x={startX - 42} y="18" width="84" height="24" rx="12" fill="#0f172a" />
-            <text x={startX} y="35" textAnchor="middle" fontSize="10" fontWeight="800" fill="#ffffff">{isEn ? "Start mark" : "スタートマーク"}</text>
-          </g>
-          <path d="M190 202 L190 152" stroke="#0f172a" strokeWidth="2" strokeDasharray="5 5" />
-          <path d={`M190 202 L${xFor(40)} 126`} stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 5" />
-          <path d={`M190 202 L${xFor(-5)} 126`} stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 5" />
-          <rect x="145" y="198" width="90" height="26" rx="13" fill="#0f172a" />
-          <text x="190" y="216" textAnchor="middle" fontSize="11" fontWeight="800" fill="#ffffff">{isEn ? "Camera position" : "撮影位置"}</text>
-          <text x="190" y="238" textAnchor="middle" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "Near midpoint of 40 m section" : "40m区間の中央付近"}</text>
-          <text x={xFor(0)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">{isEn ? "Zone entry" : "ゾーン入口"}</text>
-          <text x={xFor(30)} y="48" textAnchor="middle" fontSize="10" fontWeight="800" fill="#b91c1c">{isEn ? "Zone exit" : "ゾーン出口"}</text>
-          <text x="40" y="28" textAnchor="start" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "40 m side" : "40m側"}</text>
-          <text x="340" y="28" textAnchor="end" fontSize="10" fontWeight="700" fill="#475569">{isEn ? "-5 m side" : "-5m側"}</text>
-        </svg>
+        <img
+          src={isEn ? "/guides/baton-en.png" : "/guides/baton-ja.png"}
+          alt={isEn ? "Baton exchange filming guide" : "バトンパス撮影ガイド"}
+          className="h-auto w-full rounded-2xl"
+        />
       </div>
+
       <ul className="mt-3 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-500">
         <li>バトンゾーン入口を0mとして、手前5m（-5m）からゾーン出口後10m（40m）まで、5mごとにマーカーを設置してください。</li>
         <li>受け手のスタートマークにもマーカーを置いてください。スタートマークは通常、-5m地点よりさらに手前側に設定されますが、選手ごとに異なります。</li>

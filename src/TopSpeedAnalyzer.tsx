@@ -112,41 +112,10 @@ function dataUrlToBlob(dataUrl: string): Blob {
 
 function TopSpeedGuideGraphic({ language }: { language: Language }) {
   const isEn = language === 'en'
+  const src = isEn ? '/guides/top-speed-en.png' : '/guides/top-speed-ja.png'
   return (
     <div className="guide-graphic" aria-label={isEn ? 'Marker setup and camera position guide' : 'マーカー設置と撮影位置のガイド'}>
-      <svg viewBox="0 0 760 420" role="img" className="guide-graphic-svg">
-        <rect x="0" y="0" width="760" height="420" rx="28" fill="#f8fafc" />
-        <rect x="58" y="112" width="612" height="72" rx="28" fill="#e2e8f0" />
-        <rect x="58" y="112" width="612" height="8" fill="#cbd5e1" opacity="0.9" />
-        <line x1="160" y1="95" x2="160" y2="205" stroke="#ef4444" strokeWidth="4" />
-        <line x1="540" y1="95" x2="540" y2="205" stroke="#ef4444" strokeWidth="4" />
-        <rect x="124" y="74" width="72" height="30" rx="15" fill="#0f172a" />
-        <rect x="496" y="74" width="88" height="30" rx="15" fill="#0f172a" />
-        <text x="160" y="94" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Marker 1' : 'マーカー1'}</text>
-        <text x="540" y="94" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Marker 2' : 'マーカー2'}</text>
-        <line x1="160" y1="228" x2="540" y2="228" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
-        <polygon points="160,228 176,220 176,236" fill="#334155" />
-        <polygon points="540,228 524,220 524,236" fill="#334155" />
-        <text x="350" y="216" textAnchor="middle" fontSize="22" fontWeight="900" fill="#0f172a">{isEn ? 'Default 10 m interval' : '初期値 10 m区間'}</text>
-        <circle cx="356" cy="149" r="17" fill="#f97316" />
-        <path d="M344 170 C368 180 388 178 410 164" fill="none" stroke="#f97316" strokeWidth="7" strokeLinecap="round" />
-        <path d="M344 148 C326 158 314 174 300 190" fill="none" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-        <path d="M370 150 C390 158 406 170 424 186" fill="none" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-        <rect x="324" y="306" width="64" height="42" rx="10" fill="#0f172a" />
-        <path d="M356 348 L326 388 M356 348 L386 388 M356 348 L356 390" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-        <circle cx="356" cy="327" r="8" fill="#94a3b8" />
-        <path d="M356 306 L160 184 M356 306 L540 184 M356 306 L350 228" stroke="#64748b" strokeWidth="2.5" strokeDasharray="8 8" fill="none" />
-        <rect x="236" y="356" width="240" height="32" rx="16" fill="#1e3a8a" />
-        <text x="356" y="378" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fff">{isEn ? 'Film from the midpoint' : 'マーカーの中間で撮影'}</text>
-        <rect x="40" y="274" width="230" height="54" rx="18" fill="#eff6ff" stroke="#bfdbfe" />
-        <text x="155" y="296" textAnchor="middle" fontSize="14" fontWeight="800" fill="#1d4ed8">{isEn ? 'Stand far enough away' : '十分に離れて撮影'}</text>
-        <text x="155" y="316" textAnchor="middle" fontSize="11" fontWeight="600" fill="#475569">{isEn ? 'Keep the runner side-on throughout' : '全区間を真横から見渡す'}</text>
-        <rect x="462" y="274" width="258" height="54" rx="18" fill="#fff7ed" stroke="#fed7aa" />
-        <text x="591" y="296" textAnchor="middle" fontSize="14" fontWeight="800" fill="#c2410c">{isEn ? 'Use slow-motion video' : 'スロー動画で撮影'}</text>
-        <text x="591" y="316" textAnchor="middle" fontSize="11" fontWeight="600" fill="#475569">{isEn ? '120 fps or higher recommended' : '120 fps以上推奨'}</text>
-        <rect x="42" y="22" width="676" height="38" rx="19" fill="#0f172a" />
-        <text x="380" y="47" textAnchor="middle" fontSize="15" fontWeight="800" fill="#fff">{isEn ? 'Measure near the top-speed phase: general 40–50 m, elite 50–60 m' : 'トップスピード付近で測定：一般 40–50m、エリート 50–60m'}</text>
-      </svg>
+      <img src={src} alt={isEn ? 'Top speed filming guide' : 'トップスピード撮影ガイド'} className="guide-graphic-svg" />
     </div>
   )
 }
