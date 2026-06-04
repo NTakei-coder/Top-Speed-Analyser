@@ -338,26 +338,39 @@ function fmt(value, digits = 3) {
   return Number.isFinite(value) ? value.toFixed(digits) : "--";
 }
 
-function heightWithDefault(value) {
+function heightCmWithDefault(value) {
   const text = String(value ?? "").trim();
-  if (text === "") return 1.7;
+  if (text === "") return 170;
   return parseNum(text);
 }
 
 function validateHeight(value, label) {
   const text = String(value ?? "").trim();
   if (text === "") return null;
-  const height = parseNum(text);
-  if (!Number.isFinite(height) || height < 1 || height > 3) {
-    return `${label}は1.00〜3.00mの範囲で入力してください。未入力の場合は1.70mとして計算します。`;
+  const heightCm = parseNum(text);
+  if (!Number.isFinite(heightCm) || heightCm < 100 || heightCm > 300) {
+    return `${label}は100〜300cmの範囲で入力してください。未入力の場合は170cmとして計算します。`;
   }
   return null;
 }
 
 function reachDistanceFromHeights(giverHeightValue, receiverHeightValue) {
-  const giverHeight = heightWithDefault(giverHeightValue);
-  const receiverHeight = heightWithDefault(receiverHeightValue);
-  return Number.isFinite(giverHeight) && Number.isFinite(receiverHeight) ? (giverHeight + receiverHeight) / 2 : NaN;
+  const giverHeightM = heightCmWithDefault(giverHeightValue) / 100;
+  const receiverHeightM = heightCmWithDefault(receiverHeightValue) / 100;
+  return Number.isFinite(giverHeightM) && Number.isFinite(receiverHeightM) ? (giverHeightM + receiverHeightM) / 2 : NaN;
+}
+
+function cmToFeetInches(cmValue) {
+  const cm = parseNum(cmValue);
+  const totalInches = Number.isFinite(cm) ? cm / 2.54 : 0;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Number((totalInches - feet * 12).toFixed(1));
+  return { feet, inches };
+}
+
+function feetInchesToCm(feet, inches) {
+  const totalInches = Math.max(0, Number(feet) || 0) * 12 + Math.max(0, Number(inches) || 0);
+  return Number((totalInches * 2.54).toFixed(1));
 }
 
 function adjustedTheoreticalTime(rawTheoreticalTime, actualBatonTime, targetDistance, reachDistance) {
@@ -414,10 +427,28 @@ function markShiftText(markShift, distance) {
   return markShift > 0 ? `約${distance.toFixed(2)}m遠く` : `約${distance.toFixed(2)}m近く`;
 }
 
-function footLengthFromShoeSize(value) {
-  const shoeSize = parseNum(value);
-  if (!Number.isFinite(shoeSize) || shoeSize <= 0) return NaN;
-  return (shoeSize + 1) / 100;
+function shoeSizeToFootLengthCm(value, system = "JP_CM") {
+  const size = parseNum(value);
+  if (!Number.isFinite(size) || size <= 0) return NaN;
+  switch (system) {
+    case "US Men":
+      return ((size + 22) / 3) * 2.54;
+    case "US Women":
+      return ((size + 21) / 3) * 2.54;
+    case "UK":
+      return ((size + 23) / 3) * 2.54;
+    case "EU":
+      return (20 / 3) * (size - 2) / 10;
+    case "JP/CM":
+    default:
+      return size;
+  }
+}
+
+function footLengthFromShoeSize(value, system = "JP/CM") {
+  const footLengthCm = shoeSizeToFootLengthCm(value, system);
+  if (!Number.isFinite(footLengthCm) || footLengthCm <= 0) return NaN;
+  return (footLengthCm + 1) / 100;
 }
 
 function timeDifferenceBetweenPositions(receiverCoeff, giverCoeff, fromX, toX) {
@@ -522,19 +553,19 @@ function runSelfTests() {
   console.assert(SELECTION_TASKS[0].key === "startFrame", "startFrame task should be first");
   console.assert(SELECTION_TASKS[SELECTION_TASKS.length - 1].key === "passFrame", "passFrame task should be last");
   console.assert(SELECTION_TASKS[SELECTION_TASKS.length - 1].help.includes("渡し手の手が離れた瞬間"), "passFrame help text should include the updated definition");
-  console.assert(heightWithDefault("") === 1.7, "blank height should default to 1.7m");
-  console.assert(validateHeight("0.9", "渡し手身長") !== null, "height below 1m should be invalid");
-  console.assert(validateHeight("3.1", "受け手身長") !== null, "height above 3m should be invalid");
-  console.assert(validateHeight("1.7", "受け手身長") === null, "height within 1m to 3m should be valid");
-  console.assert(close(reachDistanceFromHeights("1.8", "1.6"), 1.7), "reach distance should be the average of giver and receiver heights");
-  console.assert(close(reachDistanceFromHeights("1.8", ""), 1.75), "blank receiver height should be treated as 1.7m while preserving giver height");
-  console.assert(close(reachDistanceFromHeights("", "1.6"), 1.65), "blank giver height should be treated as 1.7m while preserving receiver height");
+  console.assert(heightCmWithDefault("") === 170, "blank height should default to 1.7m");
+  console.assert(validateHeight("99", "渡し手身長") !== null, "height below 1m should be invalid");
+  console.assert(validateHeight("301", "受け手身長") !== null, "height above 3m should be invalid");
+  console.assert(validateHeight("170", "受け手身長") === null, "height within 1m to 3m should be valid");
+  console.assert(close(reachDistanceFromHeights("180", "160"), 1.7), "reach distance should be the average of giver and receiver heights");
+  console.assert(close(reachDistanceFromHeights("180", ""), 1.75), "blank receiver height should be treated as 1.7m while preserving giver height");
+  console.assert(close(reachDistanceFromHeights("", "160"), 1.65), "blank giver height should be treated as 1.7m while preserving receiver height");
   console.assert(close(adjustedTheoreticalTime(3.5, 3.0, 30, 1.7), 3.33), "adjusted theoretical time should subtract reach-distance gain time");
   console.assert(classifyPassSmoothness(3.9).label === "極めてスムーズ", "pass smoothness classification should detect very smooth");
   console.assert(classifyStartTiming(-0.1).label === "ぴったし", "start timing classification should detect perfect timing");
   console.assert(movementAdvice(-0.1, 0.9).includes("遠く"), "earlier start should advise moving mark farther");
   console.assert(movementAdvice(0.1, 0.9).includes("近く"), "later start should advise moving mark closer");
-  console.assert(close(footLengthFromShoeSize("26"), 0.27), "foot length should be shoe size plus 1cm converted to meters");
+  console.assert(close(footLengthFromShoeSize("26", "JP/CM"), 0.27), "foot length should be shoe size plus 1cm converted to meters");
   console.assert(markShiftDirection(0.2) === "遠く", "positive mark shift should mean farther");
   console.assert(markShiftDirection(-0.2) === "近く", "negative mark shift should mean closer");
   console.assert(crossDifferenceText(10, 11).includes("手前"), "position before cross should be labelled before");
@@ -751,6 +782,8 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
   const startTimingCaptureRef = useRef(null);
   const graphCaptureRef = useRef(null);
   const [form, setForm] = useState(DEFAULT_STATE);
+  const [heightUnit, setHeightUnit] = useState("cm");
+  const [shoeSizeSystem, setShoeSizeSystem] = useState("JP/CM");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoName, setVideoName] = useState("");
   const [duration, setDuration] = useState(NaN);
@@ -809,6 +842,24 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
   }, [previewFrame, fpsNum, videoUrl]);
 
   const getTaskValue = (task) => (task?.type === "frame" ? form.frames[task.key] : form[task?.key] || "");
+
+  const renderHeightInput = (fieldKey, labelJa, labelEn) => {
+    if (isEn && heightUnit === "ftin") {
+      const current = cmToFeetInches(form[fieldKey]);
+      return (
+        <label className="block">
+          <span className="text-xs font-medium text-slate-500">{labelEn}</span>
+          <div className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 focus-within:border-slate-400">
+            <input type="number" value={current.feet} onChange={(event) => setField(fieldKey, String(feetInchesToCm(event.target.value, current.inches)))} inputMode="decimal" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
+            <span className="text-xs text-slate-400">ft</span>
+            <input type="number" value={current.inches} onChange={(event) => setField(fieldKey, String(feetInchesToCm(current.feet, event.target.value)))} inputMode="decimal" step="0.1" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
+            <span className="text-xs text-slate-400">in</span>
+          </div>
+        </label>
+      );
+    }
+    return <Field label={isEn ? labelEn : labelJa} value={form[fieldKey]} onChange={(value) => setField(fieldKey, value)} unit="cm" inputMode="decimal" />;
+  };
 
   const handleVideoUpload = (event) => {
     const file = event.target.files?.[0];
@@ -902,7 +953,7 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
     const hand = parseNum(form.handFrame);
     const pass = parseNum(form.passFrame);
     const reachDistance = reachDistanceFromHeights(form.giverHeight, form.receiverHeight);
-    const footLength = footLengthFromShoeSize(form.shoeSize);
+    const footLength = footLengthFromShoeSize(form.shoeSize, shoeSizeSystem);
     const frameMap = { ...form.frames, startFrame: form.startFrame };
     const receiverRows = frameSpeeds(RECEIVER_FRAME_POINTS, frameMap, fps);
     const giverRows = frameSpeeds(GIVER_FRAME_POINTS, frameMap, fps);
@@ -963,10 +1014,10 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
       speedChartData.push({ distance: Number(x.toFixed(1)), receiverVelocity: receiverVelocity === null ? null : Number(receiverVelocity.toFixed(3)), giverVelocity: giverVelocity === null ? null : Number(giverVelocity.toFixed(3)) });
     }
     return { receiverRows, giverRows, handTime, passTime, startTiming, handDistance, passDistance, handToPassTime: passTime - handTime, handToPassDistance: passDistance - handDistance, baton30Time, baton40Time, estimatedPerfectPassDistance, intersectionDistance, intersectionReceiverTime, passToIntersectionDistance, perfectPassDifference, startAdjustmentFromPerfect, requiredLeadTime, markShiftDistance, footLength, requiredMarkShift, requiredMarkShiftDistance, requiredFootCount, footReferenceRows, rawTheoretical30Time, rawTheoretical40Time, theoretical30Time, theoretical40Time, speedChartData, warnings };
-  }, [form]);
+  }, [form, shoeSizeSystem]);
 
   const smoothness = classifyPassSmoothness(result.handToPassDistance);
-  const reset = () => { setForm(DEFAULT_STATE); setTaskIndex(0); setPassPreviewOffset(0); };
+  const reset = () => { setForm(DEFAULT_STATE); setHeightUnit("cm"); setShoeSizeSystem("JP/CM"); setTaskIndex(0); setPassPreviewOffset(0); };
 
   const captureElementCanvas = async (element) => {
     if (!element) return null;
@@ -1396,10 +1447,11 @@ ${appUrl}`;
               <Field label="受け手" value={form.receiver} onChange={(value) => setField("receiver", value)} />
               <Field label="試技回数" value={form.attempt} onChange={(value) => setField("attempt", value)} />
               <Field label="歩数" value={form.steps} onChange={(value) => setField("steps", value)} inputMode="decimal" />
-              <Field label="渡し手身長" value={form.giverHeight} onChange={(value) => setField("giverHeight", value)} unit="m" inputMode="decimal" />
-              <Field label="受け手身長" value={form.receiverHeight} onChange={(value) => setField("receiverHeight", value)} unit="m" inputMode="decimal" />
+              {isEn ? <SelectField label="Height unit" value={heightUnit} onChange={setHeightUnit} options={["cm", "ft/in"]} placeholder="Select" /> : null}
+              {renderHeightInput("giverHeight", "渡し手身長 cm", "Giver height")}
+              {renderHeightInput("receiverHeight", "受け手身長 cm", "Receiver height")}
             </div>
-            <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">未入力の場合は1.70mとして計算し、渡し手と受け手の平均身長を「手を伸ばし合った利得距離」として扱います。</p>
+            <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">未入力の場合は170cmとして計算し、渡し手と受け手の平均身長を「手を伸ばし合った利得距離」として扱います。</p>
           </section>
 
           <BatonMarkerGuide language={language} />
@@ -1546,7 +1598,10 @@ ${appUrl}`;
                 </div>
               </div>
               <div className="mt-3 rounded-2xl bg-white p-3">
-                <Field label="靴のサイズ（cm）" value={form.shoeSize} onChange={(value) => setField("shoeSize", value)} unit="cm" inputMode="decimal" />
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr]">
+                  <SelectField label={isEn ? "Shoe size system" : "靴サイズ表記"} value={shoeSizeSystem} onChange={setShoeSizeSystem} options={["JP/CM", "US Men", "US Women", "UK", "EU"]} placeholder={isEn ? "Select system" : "選択してください"} />
+                  <Field label={isEn ? "Shoe size" : "靴のサイズ"} value={form.shoeSize} onChange={(value) => setField("shoeSize", value)} unit={shoeSizeSystem === "JP/CM" ? "cm" : ""} inputMode="decimal" />
+                </div>
                 <p className="mt-2 text-xs leading-5 text-slate-500">出のタイミングがぴったりだった場合に、速度交点でバトンパスを完了するためのスタートマーク調整量を推定します。1足長は「靴サイズ＋1 cm」で計算します。</p>
                 <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                   {Number.isFinite(result.requiredMarkShift) && Math.abs(result.requiredMarkShift) < 0.01 ? (

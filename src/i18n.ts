@@ -292,6 +292,24 @@ const jaToEn: Record<string, string> = {
   '通常は、渡し手がマークを通過する少し前に受け手が動き出すのが一般的です。ただし、この目安は動き出しからの時間を基にした参考値であり、スタートの癖や競技レベルによって適切な値は異なります。': 'In general, the receiver starts slightly before the giver reaches the mark. This is a reference based on start timing, and the appropriate timing may differ depending on the athlete’s start pattern and competitive level.',
   '渡し手身長は1.00〜3.00mの範囲で入力してください。未入力の場合は1.70mとして計算します。': 'Giver height must be between 1.00 and 3.00 m. If left blank, 1.70 m is used.',
   '受け手身長は1.00〜3.00mの範囲で入力してください。未入力の場合は1.70mとして計算します。': 'Receiver height must be between 1.00 and 3.00 m. If left blank, 1.70 m is used.',
+
+  '渡し手がバトンゾーン入り口（0m地点）を通過し、受け手がバトンゾーン出口（30m地点）を通過するまでの時間です。': 'Time from when the giver passes the baton-zone entrance (0 m point) to when the receiver passes the baton-zone exit (30 m point).',
+  '渡し手がバトンゾーン入り口（0m地点）を通過し、受け手がバトンゾーン出口から10m先（40m地点）を通過するまでの時間です。この距離はバトンパス後の加速のスムーズさも反映しています。': 'Time from when the giver passes the baton-zone entrance (0 m point) to when the receiver passes 10 m beyond the baton-zone exit (40 m point). This also reflects how smoothly the receiver accelerates after the exchange.',
+  '挙手時点における受け手の位置です。受け手の速度曲線から推定しています。': 'Receiver position at the Hand Raise Frame, estimated from the receiver speed curve.',
+  'バトンパス完了時点における受け手の位置です。受け手の速度曲線から推定しています。': 'Receiver position at the Baton Pass Completion Frame, estimated from the receiver speed curve.',
+  'SNS共有': 'Share on SNS',
+  '3次回帰': 'Cubic regression',
+  '渡し手身長 cm': 'Giver height cm',
+  '受け手身長 cm': 'Receiver height cm',
+  '靴サイズ表記': 'Shoe size system',
+  '靴のサイズ': 'Shoe size',
+  '未入力の場合は170cmとして計算し、渡し手と受け手の平均身長を「手を伸ばし合った利得距離」として扱います。': 'If left blank, 170 cm is used. The average height of the giver and receiver is treated as the reach-distance gain.',
+  '100〜300cmの範囲で入力してください。未入力の場合は170cmとして計算します。': 'Enter a value between 100 and 300 cm. If left blank, 170 cm is used.',
+  '渡し手身長は100〜300cmの範囲で入力してください。未入力の場合は170cmとして計算します。': 'Giver height must be between 100 and 300 cm. If left blank, 170 cm is used.',
+  '受け手身長は100〜300cmの範囲で入力してください。未入力の場合は170cmとして計算します。': 'Receiver height must be between 100 and 300 cm. If left blank, 170 cm is used.',
+  'Height unit': 'Height unit',
+  'Shoe size system': 'Shoe size system',
+  'Shoe size': 'Shoe size',
 }
 
 const enToJa = Object.fromEntries(Object.entries(jaToEn).map(([ja, en]) => [en, ja]))

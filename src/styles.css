@@ -1438,3 +1438,15 @@ video::-webkit-media-controls-start-playback-button {
     grid-template-columns: 1fr;
   }
 }
+
+
+.inline-inputs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-inputs input {
+  min-width: 0;
+}

@@ -176,6 +176,18 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 
+function cmToFeetInches(cm: number): { feet: number; inches: number } {
+  const totalInches = Number.isFinite(cm) ? cm / 2.54 : 0
+  const feet = Math.floor(totalInches / 12)
+  const inches = Number((totalInches - feet * 12).toFixed(1))
+  return { feet, inches }
+}
+
+function feetInchesToCm(feet: number, inches: number): number {
+  const totalInches = Math.max(0, feet || 0) * 12 + Math.max(0, inches || 0)
+  return Number((totalInches * 2.54).toFixed(1))
+}
+
 function TopSpeedGuideGraphic({ language }: { language: Language }) {
   const isEn = language === 'en'
   const src = isEn ? '/guides/top-speed-en.png' : '/guides/top-speed-ja.png'
@@ -192,6 +204,7 @@ function App({ language = 'ja' }: { language?: Language }) {
   const programmaticSeekRef = useRef(false)
 
   const [athlete, setAthlete] = useState<AthleteInfo>({ name: '', date: new Date().toISOString().slice(0, 10), heightCm: 170, sex: 'male' })
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ftin'>('cm')
   const [distanceM, setDistanceM] = useState(10)
   const [fps, setFps] = useState(120)
   const [fpsEstimateInfo, setFpsEstimateInfo] = useState('')
@@ -222,6 +235,7 @@ function App({ language = 'ja' }: { language?: Language }) {
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
   const currentTrimImage = sequenceImages[trimIndex] ?? null
   const sexLabel = athlete.sex === 'male' ? (language === 'en' ? 'Male' : '男性') : (language === 'en' ? 'Female' : '女性')
+  const heightFeetInches = cmToFeetInches(athlete.heightCm)
   const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
 
   const result = useMemo(() => {
@@ -578,10 +592,31 @@ ${appUrl}`
               日付
               <input type={language === 'en' ? 'text' : 'date'} placeholder={language === 'en' ? 'YYYY-MM-DD' : undefined} value={athlete.date} onChange={(e) => updateAthlete('date', e.target.value)} />
             </label>
-            <label>
-              身長 cm
-              <input type="number" value={athlete.heightCm} onChange={(e) => updateAthlete('heightCm', Number(e.target.value))} min={100} max={230} />
-            </label>
+            {language === 'en' && (
+              <label>
+                Height unit
+                <select value={heightUnit} onChange={(e) => setHeightUnit(e.target.value as 'cm' | 'ftin')}>
+                  <option value="cm">cm</option>
+                  <option value="ftin">ft/in</option>
+                </select>
+              </label>
+            )}
+            {language === 'en' && heightUnit === 'ftin' ? (
+              <label>
+                Height
+                <div className="inline-inputs">
+                  <input type="number" value={heightFeetInches.feet} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(Number(e.target.value), heightFeetInches.inches))} min={3} max={8} />
+                  <span>ft</span>
+                  <input type="number" value={heightFeetInches.inches} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(heightFeetInches.feet, Number(e.target.value)))} min={0} max={11.9} step="0.1" />
+                  <span>in</span>
+                </div>
+              </label>
+            ) : (
+              <label>
+                身長 cm
+                <input type="number" value={athlete.heightCm} onChange={(e) => updateAthlete('heightCm', Number(e.target.value))} min={100} max={230} />
+              </label>
+            )}
             <label>
               性別
               <select value={athlete.sex} onChange={(e) => updateAthlete('sex', e.target.value as Sex)}>
