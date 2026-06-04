@@ -844,7 +844,7 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
   const getTaskValue = (task) => (task?.type === "frame" ? form.frames[task.key] : form[task?.key] || "");
 
   const renderHeightInput = (fieldKey, labelJa, labelEn) => {
-    if (isEn && heightUnit === "ftin") {
+    if (isEn && (heightUnit === "ftin" || heightUnit === "ft/in")) {
       const current = cmToFeetInches(form[fieldKey]);
       return (
         <label className="block">
@@ -1557,12 +1557,12 @@ ${appUrl}`;
           </section>
 
           <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
-            <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-bold text-slate-700">渡し手・受け手の速度比較</h2><span className="text-xs text-slate-400">3次回帰</span></div>
+            <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-bold text-slate-700">{isEn ? "Giver and receiver speed comparison" : "渡し手・受け手の速度比較"}</h2><span className="text-xs text-slate-400">{isEn ? "Cubic fit" : "3次回帰"}</span></div>
             <div ref={graphCaptureRef} className="h-80 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={result.speedChartData} margin={{ top: 12, right: 12, left: 0, bottom: 54 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="distance" type="number" domain={[-5, 40]} ticks={[-5, 0, 5, 10, 15, 20, 25, 30, 35, 40]} tick={{ fontSize: 11 }} label={{ value: "バトンゾーン入り口からの距離(m)", position: "insideBottom", offset: -24, fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} domain={[0, "auto"]} label={{ value: "走速度(m/s)", angle: -90, position: "insideLeft", fontSize: 11 }} />
-              <Tooltip formatter={(value, name) => [`${value} m/s`, name === "receiverVelocity" ? "受け手" : "渡し手"]} labelFormatter={(label) => `${label} m地点`} />
+              <XAxis dataKey="distance" type="number" domain={[-5, 40]} ticks={[-5, 0, 5, 10, 15, 20, 25, 30, 35, 40]} tick={{ fontSize: 11 }} label={{ value: isEn ? "Distance from exchange-zone entry (m)" : "バトンゾーン入り口からの距離(m)", position: "insideBottom", offset: -24, fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} domain={[0, "auto"]} label={{ value: isEn ? "Running speed (m/s)" : "走速度(m/s)", angle: -90, position: "insideLeft", fontSize: 11 }} />
+              <Tooltip formatter={(value, name) => [`${value} m/s`, name === "receiverVelocity" ? (isEn ? "Receiver" : "受け手") : (isEn ? "Giver" : "渡し手")]} labelFormatter={(label) => isEn ? `${label} m point` : `${label} m地点`} />
               {Number.isFinite(result.handDistance) && Number.isFinite(result.passDistance) ? <ReferenceArea x1={Math.min(result.handDistance, result.passDistance)} x2={Math.max(result.handDistance, result.passDistance)} fill="#fde68a" fillOpacity={0.35} /> : null}
               {Number.isFinite(result.handDistance) ? <ReferenceLine x={Number(result.handDistance.toFixed(1))} stroke="#16a34a" strokeWidth={2} strokeDasharray="4 4" /> : null}
               {Number.isFinite(result.passDistance) ? <ReferenceLine x={Number(result.passDistance.toFixed(1))} stroke="#f97316" strokeWidth={2} strokeDasharray="4 4" /> : null}
@@ -1571,13 +1571,13 @@ ${appUrl}`;
               <Line type="monotone" dataKey="receiverVelocity" stroke="#2563eb" strokeWidth={3} dot={false} connectNulls name="receiverVelocity" />
             </LineChart></ResponsiveContainer></div>
             <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-slate-600">
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-2 w-4 rounded-full bg-red-500" />渡し手</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-2 w-4 rounded-full bg-blue-600" />受け手</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-green-600" />挙手位置</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-orange-500" />完了位置</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-purple-500" />速度交点</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-2 w-4 rounded-full bg-red-500" />{isEn ? "Giver" : "渡し手"}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-2 w-4 rounded-full bg-blue-600" />{isEn ? "Receiver" : "受け手"}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-green-600" />{isEn ? "Hand Raise position" : "挙手位置"}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-orange-500" />{isEn ? "Completion position" : "完了位置"}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1"><span className="h-4 w-1 rounded-full bg-purple-500" />{isEn ? "Speed intersection" : "速度交点"}</span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">薄い黄色の範囲は、挙手位置からパス完了位置までの受け渡し区間です。</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{isEn ? "The pale yellow area indicates the exchange phase from hand raise to pass completion." : "薄い黄色の範囲は、挙手位置からパス完了位置までの受け渡し区間です。"}</p>
             <div className="mt-3 rounded-2xl bg-slate-50 p-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
