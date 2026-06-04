@@ -576,7 +576,7 @@ ${appUrl}`
             </label>
             <label>
               日付
-              <input type="date" value={athlete.date} onChange={(e) => updateAthlete('date', e.target.value)} />
+              <input type={language === 'en' ? 'text' : 'date'} placeholder={language === 'en' ? 'YYYY-MM-DD' : undefined} value={athlete.date} onChange={(e) => updateAthlete('date', e.target.value)} />
             </label>
             <label>
               身長 cm
@@ -757,7 +757,7 @@ ${appUrl}`
             <div className="section-header">
               <div>
                 <h2>分析結果</h2>
-                <p className="muted">{athlete.date || '日付未入力'} / {athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
+                <p className="muted">{athlete.date || (language === 'en' ? 'No date' : '日付未入力')} / {athlete.name || 'No name'} / {athlete.heightCm} cm / {sexLabel}</p>
               </div>
             </div>
             <div className="result-grid">

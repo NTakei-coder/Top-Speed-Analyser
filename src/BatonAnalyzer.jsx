@@ -659,7 +659,7 @@ function StartTimingGauge({ value, captureRef = null }) {
         </div>
         <div className="mt-1 flex justify-between text-[11px] font-bold text-slate-500"><span>早い</span><span>ぴったし</span><span>遅い</span></div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-slate-500">通常は-0.1秒程度で動き出すのが一般的です。ただし、この目安は動き出しからの時間を基にした参考値であり、スタートの癖や競技レベルによって適切な値は異なります。</p>
+      <p className="mt-3 text-xs leading-5 text-slate-500">通常は、渡し手がマークを通過する少し前に受け手が動き出すのが一般的です。ただし、この目安は動き出しからの時間を基にした参考値であり、スタートの癖や競技レベルによって適切な値は異なります。</p>
     </div>
   );
 }
@@ -1390,7 +1390,7 @@ ${appUrl}`;
           <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
             <div className="mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /><h2 className="text-sm font-bold text-slate-700">分析情報</h2></div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Field label="日付" type="date" value={form.date} onChange={(value) => setField("date", value)} />
+              <Field label="日付" type={isEn ? "text" : "date"} value={form.date} onChange={(value) => setField("date", value)} />
               <SelectField label="走順" value={form.leg} onChange={(value) => setField("leg", value)} options={["1-2走", "2-3走", "3-4走"]} />
               <Field label="渡し手" value={form.giver} onChange={(value) => setField("giver", value)} />
               <Field label="受け手" value={form.receiver} onChange={(value) => setField("receiver", value)} />
@@ -1501,7 +1501,7 @@ ${appUrl}`;
 
           <section className="mt-4 space-y-3">
             <StartTimingGauge value={result.startTiming} captureRef={startTimingCaptureRef} />
-            <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-100"><h2 className="text-sm font-bold text-slate-700">出のタイミングぴったし時の推定完了位置</h2><div className="mt-3 grid grid-cols-3 gap-3"><MiniMetric label="実際の完了位置" value={fmt(result.passDistance)} unit="m" /><MiniMetric label="ぴったし時の推定" value={fmt(result.estimatedPerfectPassDistance)} unit="m" /><MiniMetric label="差分" value={signedText(result.perfectPassDifference)} unit="m" /></div><p className="mt-2 text-xs leading-5 text-slate-500">実際の出のタイミングがぴったし（-0.10秒）だった場合のパス完了位置を、受け手の速度曲線から参考推定しています。タイミングのずれによって受け手や渡し手に減速が生じる場合は推定からずれるため、あくまで参考値です。</p></div>
+            <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-100"><h2 className="text-sm font-bold text-slate-700">出のタイミングぴったし時の推定完了位置</h2><div className="mt-3 grid grid-cols-3 gap-3"><MiniMetric label="実際の完了位置" value={fmt(result.passDistance)} unit="m" /><MiniMetric label="ぴったし時の推定" value={fmt(result.estimatedPerfectPassDistance)} unit="m" /><MiniMetric label="差分" value={signedText(result.perfectPassDifference)} unit="m" /></div><p className="mt-2 text-xs leading-5 text-slate-500">実際の出のタイミングがぴったしだった場合のパス完了位置を、受け手の速度曲線から参考推定しています。タイミングのずれによって受け手や渡し手に減速が生じる場合は推定からずれるため、あくまで参考値です。</p></div>
           </section>
 
           <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm border border-slate-100">
