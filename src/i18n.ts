@@ -312,6 +312,8 @@ const jaToEn: Record<string, string> = {
   'Height unit': 'Height unit',
   'Shoe size system': 'Shoe size system',
   'Shoe size': 'Shoe size',
+
+  'marker2 は marker1 より後のフレームである必要があります。': 'marker2 must be later than marker1.',
 }
 
 const enToJa = Object.fromEntries(Object.entries(jaToEn).map(([ja, en]) => [en, ja]))

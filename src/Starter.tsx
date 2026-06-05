@@ -15,7 +15,7 @@ type ScheduledSource = AudioBufferSourceNode
 const audioUrls = {
   onMarks: '/audio/on-your-marks.mp3',
   set: '/audio/set.mp3',
-  startSignal: '/audio/start-signal.mp3',
+  startSignal: '/audio/start-signal.wav',
 } as const
 
 const REST_TIMER_STORAGE_KEY = 'sprint-tools-rest-timer-start-ms'
@@ -181,7 +181,23 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       ])
       buffersRef.current = { onMarks, set, startSignal }
     }
+    warmUpAudioOutput(context)
     return { context, buffers: buffersRef.current }
+  }
+
+  const warmUpAudioOutput = (context: AudioContext) => {
+    try {
+      const buffer = context.createBuffer(1, 1, context.sampleRate)
+      const source = context.createBufferSource()
+      const gain = context.createGain()
+      gain.gain.value = 0
+      source.buffer = buffer
+      source.connect(gain)
+      gain.connect(context.destination)
+      source.start(context.currentTime + 0.01)
+    } catch {
+      // Ignore warm-up failures; scheduled playback still works.
+    }
   }
 
   const clearTimers = () => {
@@ -320,7 +336,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       stopSources()
       currentRunRef.current += 1
       const runId = currentRunRef.current
-      const now = context.currentTime + 0.08
+      const now = context.currentTime + 0.25
       const setTime = now + safeOnMarksToSet
       const signalTime = setTime + setToSignalSec
       const signalEndWallTimeMs = Date.now() + Math.max(0, (signalTime + buffers.startSignal.duration - context.currentTime) * 1000)
@@ -353,7 +369,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     try {
       const { context, buffers } = await ensureBuffers()
       stopSources()
-      const now = context.currentTime + 0.05
+      const now = context.currentTime + 0.12
       scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.875 : 1.0)
       setMessage(text.ready)
       setStatus('idle')
@@ -433,18 +449,6 @@ function Starter({ language = 'ja' }: { language?: Language }) {
           {message ? <p>{message}</p> : null}
         </div>
 
-        <div className="starter-rest-timer-card">
-          <div>
-            <span>{text.restTimer}</span>
-            <strong>{formatRestTimeFromStart(restTimerStartAtMs, nowMs)}</strong>
-            <p>{text.restTimerDescription}</p>
-          </div>
-          <div className="starter-rest-timer-actions">
-            <button type="button" onClick={() => startRestTimer(Date.now(), 'manual')}>{text.manualTimerStart}</button>
-            <button type="button" onClick={() => resetRestTimer()}>{text.timerReset}</button>
-          </div>
-        </div>
-
         <div className="starter-actions">
           <button type="button" className="primary" onClick={() => void startSequence()} disabled={status === 'running' || status === 'loading'}>
             {text.start}
@@ -459,6 +463,19 @@ function Starter({ language = 'ja' }: { language?: Language }) {
           <button type="button" onClick={() => void testSound('set')} disabled={status === 'running' || status === 'loading'}>{text.testSet}</button>
           <button type="button" onClick={() => void testSound('startSignal')} disabled={status === 'running' || status === 'loading'}>{text.testSignal}</button>
         </div>
+
+        <div className="starter-rest-timer-card">
+          <div>
+            <span>{text.restTimer}</span>
+            <strong>{formatRestTimeFromStart(restTimerStartAtMs, nowMs)}</strong>
+            <p>{text.restTimerDescription}</p>
+          </div>
+          <div className="starter-rest-timer-actions">
+            <button type="button" onClick={() => startRestTimer(Date.now(), 'manual')}>{text.manualTimerStart}</button>
+            <button type="button" onClick={() => resetRestTimer()}>{text.timerReset}</button>
+          </div>
+        </div>
+
       </section>
 
       <section className="starter-note">
