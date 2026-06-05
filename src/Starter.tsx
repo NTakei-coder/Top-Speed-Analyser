@@ -369,8 +369,17 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     try {
       const { context, buffers } = await ensureBuffers()
       stopSources()
+      currentRunRef.current += 1
+      const runId = currentRunRef.current
       const now = context.currentTime + 0.12
       scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.875 : 1.0)
+
+      if (kind === 'startSignal') {
+        scheduleScreenFlash(runId, context, now)
+        const signalEndWallTimeMs = Date.now() + Math.max(0, (now + buffers.startSignal.duration - context.currentTime) * 1000)
+        startRestTimer(signalEndWallTimeMs, 'auto')
+      }
+
       setMessage(text.ready)
       setStatus('idle')
       track('starter_test_sound', { language, sound: kind })
