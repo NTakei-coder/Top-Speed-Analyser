@@ -18,6 +18,26 @@ const audioUrls = {
   startSignal: '/audio/start-signal.mp3',
 } as const
 
+const REST_TIMER_STORAGE_KEY = 'sprint-tools-rest-timer-start-ms'
+const REST_TIMER_MAX_SECONDS = 59 * 60 + 59
+
+function formatRestTimeFromStart(startAtMs: number | null, nowMs: number): string {
+  if (!startAtMs) return '00:00'
+  const elapsed = Math.max(0, Math.floor((nowMs - startAtMs) / 1000))
+  const capped = Math.min(elapsed, REST_TIMER_MAX_SECONDS)
+  const minutes = Math.floor(capped / 60)
+  const seconds = capped % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function getStoredRestTimerStart(): number | null {
+  if (typeof window === 'undefined') return null
+  const stored = window.localStorage.getItem(REST_TIMER_STORAGE_KEY)
+  if (!stored) return null
+  const parsed = Number(stored)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function chooseRandomStartDelay(): number {
   const min = 1.75
   const max = 2.25
@@ -48,6 +68,8 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const [lastStartDelay, setLastStartDelay] = useState<number | null>(null)
   const [screenFlashEnabled, setScreenFlashEnabled] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
+  const [restTimerStartAtMs, setRestTimerStartAtMs] = useState<number | null>(() => getStoredRestTimerStart())
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const buffersRef = useRef<AudioBuffers | null>(null)
@@ -94,6 +116,12 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     screenFlashDescription: isEn
       ? 'When enabled, the screen flashes at the start signal so the timekeeper can see the start cue.'
       : '画面フラッシュを使うと画面が発光し、計測者にスタート合図を送れます。',
+    restTimer: isEn ? 'Rest timer' : '休憩タイマー',
+    restTimerDescription: isEn
+      ? 'For high-intensity sprinting, take enough recovery between runs (at least about 5 minutes).'
+      : '高強度のスプリントを行うには十分な休憩（少なくとも5分〜）を取りましょう。',
+    manualTimerStart: isEn ? 'Start rest timer manually' : '手動でタイマースタート',
+    timerReset: isEn ? 'Reset timer' : 'タイマーリセット',
   }), [isEn])
 
   useEffect(() => {
@@ -103,6 +131,33 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now())
+    updateNow()
+    const interval = window.setInterval(updateNow, 1000)
+    window.addEventListener('visibilitychange', updateNow)
+    window.addEventListener('focus', updateNow)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('visibilitychange', updateNow)
+      window.removeEventListener('focus', updateNow)
+    }
+  }, [])
+
+  const startRestTimer = (startAtMs = Date.now(), source: 'auto' | 'manual' = 'manual') => {
+    setRestTimerStartAtMs(startAtMs)
+    setNowMs(Date.now())
+    window.localStorage.setItem(REST_TIMER_STORAGE_KEY, String(startAtMs))
+    track(source === 'auto' ? 'starter_rest_timer_auto_started' : 'starter_rest_timer_manual_started', { language })
+  }
+
+  const resetRestTimer = (trackEvent = true) => {
+    setRestTimerStartAtMs(null)
+    setNowMs(Date.now())
+    window.localStorage.removeItem(REST_TIMER_STORAGE_KEY)
+    if (trackEvent) track('starter_rest_timer_reset', { language })
+  }
 
   const getAudioContext = async (): Promise<AudioContext> => {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -168,6 +223,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     setNextCue('')
     setTimeLeft(null)
     setMessage(text.ready)
+    if (restTimerStartAtMs !== null && restTimerStartAtMs > Date.now()) resetRestTimer(false)
     if (trackEvent) track('starter_stopped', { language })
   }
 
@@ -267,17 +323,19 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       const now = context.currentTime + 0.08
       const setTime = now + safeOnMarksToSet
       const signalTime = setTime + setToSignalSec
+      const signalEndWallTimeMs = Date.now() + Math.max(0, (signalTime + buffers.startSignal.duration - context.currentTime) * 1000)
 
       scheduleBuffer(context, buffers.onMarks, now, 1.0)
       scheduleBuffer(context, buffers.set, setTime, 1.0)
       // Start signal sound is scheduled at signalTime.
-      scheduleBuffer(context, buffers.startSignal, signalTime, 1.5)
+      scheduleBuffer(context, buffers.startSignal, signalTime, 1.875)
 
       setStatus('running')
       setMessage(text.running)
       setCountdown(runId, now, setTime, signalTime)
       // Screen flash uses the same signalTime as the start signal sound.
       scheduleScreenFlash(runId, context, signalTime)
+      startRestTimer(signalEndWallTimeMs, 'auto')
       track('starter_started', {
         language,
         on_marks_to_set_sec: String(safeOnMarksToSet),
@@ -296,7 +354,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       const { context, buffers } = await ensureBuffers()
       stopSources()
       const now = context.currentTime + 0.05
-      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.5 : 1.0)
+      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.875 : 1.0)
       setMessage(text.ready)
       setStatus('idle')
       track('starter_test_sound', { language, sound: kind })
@@ -373,6 +431,18 @@ function Starter({ language = 'ja' }: { language?: Language }) {
             <strong>{text.next}: {nextCue} / {text.timeLeft}: {formatTime(timeLeft)} s</strong>
           ) : null}
           {message ? <p>{message}</p> : null}
+        </div>
+
+        <div className="starter-rest-timer-card">
+          <div>
+            <span>{text.restTimer}</span>
+            <strong>{formatRestTimeFromStart(restTimerStartAtMs, nowMs)}</strong>
+            <p>{text.restTimerDescription}</p>
+          </div>
+          <div className="starter-rest-timer-actions">
+            <button type="button" onClick={() => startRestTimer(Date.now(), 'manual')}>{text.manualTimerStart}</button>
+            <button type="button" onClick={() => resetRestTimer()}>{text.timerReset}</button>
+          </div>
         </div>
 
         <div className="starter-actions">
