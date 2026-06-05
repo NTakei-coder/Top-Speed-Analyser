@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import {
@@ -796,6 +797,7 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
   const [shareStatus, setShareStatus] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const appUrl = useMemo(() => (typeof window === "undefined" ? "" : new URL("/", window.location.href).toString()), []);
+  const analysisCompletedSignatureRef = useRef("");
   const translateResultLabel = (label) => {
     if (!isEn) return label;
     const map = {
@@ -864,6 +866,7 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
   const handleVideoUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    track("video_uploaded", { analysis_type: "baton", language });
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     const nextUrl = URL.createObjectURL(file);
     setVideoUrl(nextUrl);
@@ -1015,6 +1018,26 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
     }
     return { receiverRows, giverRows, handTime, passTime, startTiming, handDistance, passDistance, handToPassTime: passTime - handTime, handToPassDistance: passDistance - handDistance, baton30Time, baton40Time, estimatedPerfectPassDistance, intersectionDistance, intersectionReceiverTime, passToIntersectionDistance, perfectPassDifference, startAdjustmentFromPerfect, requiredLeadTime, markShiftDistance, footLength, requiredMarkShift, requiredMarkShiftDistance, requiredFootCount, footReferenceRows, rawTheoretical30Time, rawTheoretical40Time, theoretical30Time, theoretical40Time, speedChartData, warnings };
   }, [form, shoeSizeSystem]);
+
+  useEffect(() => {
+    const requiredValues = [
+      form.fps,
+      form.startFrame,
+      form.markFrame,
+      form.handFrame,
+      form.passFrame,
+      ...Object.values(form.frames),
+    ];
+    const allRequiredRegistered = requiredValues.every((value) => String(value ?? "").trim() !== "");
+    if (!allRequiredRegistered || result.warnings.length > 0) return;
+    const signature = requiredValues.join("|");
+    if (!signature || signature === analysisCompletedSignatureRef.current) return;
+    analysisCompletedSignatureRef.current = signature;
+    track("analysis_completed", {
+      analysis_type: "baton",
+      language,
+    });
+  }, [form, result.warnings.length, language]);
 
   const smoothness = classifyPassSmoothness(result.handToPassDistance);
   const reset = () => { setForm(DEFAULT_STATE); setHeightUnit("cm"); setShoeSizeSystem("JP/CM"); setTaskIndex(0); setPassPreviewOffset(0); };
@@ -1388,6 +1411,7 @@ ${appUrl}`;
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      track("result_image_saved", { analysis_type: "baton", language });
     } catch (_error) {
       window.alert("画像保存に失敗しました。ブラウザを更新して再度お試しください。");
     } finally {
@@ -1403,12 +1427,15 @@ ${appUrl}`;
       const file = new File([blob], `baton-analysis-${new Date().toISOString().slice(0, 10)}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl, files: [file] });
+        track("sns_shared", { analysis_type: "baton", language, with_image: "true" });
         setShareStatus("共有メニューを開きました。");
       } else if (navigator.share) {
         await navigator.share({ title: isEn ? "Baton Exchange Analysis Result" : "バトンパス分析結果", text, url: appUrl });
+        track("sns_shared", { analysis_type: "baton", language, with_image: "false" });
         setShareStatus("共有メニューを開きました。画像は必要に応じて別途保存してください。");
       } else {
         await navigator.clipboard.writeText(text);
+        track("sns_shared", { analysis_type: "baton", language, method: "clipboard" });
         setShareStatus("共有文とURLをクリップボードにコピーしました。画像は結果保存ボタンから保存してください。");
       }
     } catch (error) {
