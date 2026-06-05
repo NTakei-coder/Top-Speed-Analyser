@@ -1714,7 +1714,7 @@ video::-webkit-media-controls-start-playback-button {
   inset: 0;
   z-index: 999999;
   pointer-events: none;
-  background: #ffffff;
+  background: #22c55e;
   animation: starterScreenFlash 700ms ease-out forwards;
 }
 

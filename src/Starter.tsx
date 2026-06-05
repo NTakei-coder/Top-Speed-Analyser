@@ -40,7 +40,7 @@ async function loadBuffer(context: AudioContext, url: string): Promise<AudioBuff
 
 function Starter({ language = 'ja' }: { language?: Language }) {
   const isEn = language === 'en'
-  const [onMarksToSetSec, setOnMarksToSetSec] = useState(20)
+  const [onMarksToSetSec, setOnMarksToSetSec] = useState<number | ''>(20)
   const [status, setStatus] = useState<StarterStatus>('idle')
   const [message, setMessage] = useState('')
   const [nextCue, setNextCue] = useState('')
@@ -254,7 +254,8 @@ function Starter({ language = 'ja' }: { language?: Language }) {
 
   const startSequence = async () => {
     try {
-      const safeOnMarksToSet = Math.max(1, Math.min(60, Number(onMarksToSetSec) || 20))
+      const requestedOnMarksToSet = onMarksToSetSec === '' ? 20 : Number(onMarksToSetSec)
+      const safeOnMarksToSet = Math.max(1, Math.min(60, Number.isFinite(requestedOnMarksToSet) ? requestedOnMarksToSet : 20))
       setOnMarksToSetSec(safeOnMarksToSet)
       const setToSignalSec = chooseRandomStartDelay()
       setLastStartDelay(setToSignalSec)
@@ -335,7 +336,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
                 max="60"
                 step="0.5"
                 value={onMarksToSetSec}
-                onChange={(event) => setOnMarksToSetSec(Number(event.target.value))}
+                onChange={(event) => setOnMarksToSetSec(event.target.value === '' ? '' : Number(event.target.value))}
                 disabled={status === 'running' || status === 'loading'}
               />
               <strong>{text.seconds}</strong>

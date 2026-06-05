@@ -201,6 +201,12 @@ function TopSpeedGuideGraphic({ language }: { language: Language }) {
 
 function App({ language = 'ja' }: { language?: Language }) {
   const topText = ui[language]
+  const inputNumberValue = (value: number) => Number.isFinite(value) && value > 0 ? String(value) : ''
+  const parseOptionalPositiveNumber = (value: string, fallback: number) => {
+    if (value.trim() === '') return 0
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const programmaticSeekRef = useRef(false)
 
@@ -622,16 +628,16 @@ ${appUrl}`
               <label>
                 Height
                 <div className="inline-inputs">
-                  <input type="number" value={heightFeetInches.feet} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(Number(e.target.value), heightFeetInches.inches))} min={3} max={8} />
+                  <input type="number" value={heightFeetInches.feet > 0 ? String(heightFeetInches.feet) : ''} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(parseOptionalPositiveNumber(e.target.value, heightFeetInches.feet), heightFeetInches.inches))} min={3} max={8} />
                   <span>ft</span>
-                  <input type="number" value={heightFeetInches.inches} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(heightFeetInches.feet, Number(e.target.value)))} min={0} max={11.9} step="0.1" />
+                  <input type="number" value={Number.isFinite(heightFeetInches.inches) && heightFeetInches.inches > 0 ? String(heightFeetInches.inches) : ''} onChange={(e) => updateAthlete('heightCm', feetInchesToCm(heightFeetInches.feet, parseOptionalPositiveNumber(e.target.value, heightFeetInches.inches)))} min={0} max={11.9} step="0.1" />
                   <span>in</span>
                 </div>
               </label>
             ) : (
               <label>
                 身長 cm
-                <input type="number" value={athlete.heightCm} onChange={(e) => updateAthlete('heightCm', Number(e.target.value))} min={100} max={230} />
+                <input type="number" value={inputNumberValue(athlete.heightCm)} onChange={(e) => updateAthlete('heightCm', parseOptionalPositiveNumber(e.target.value, athlete.heightCm))} min={100} max={230} />
               </label>
             )}
             <label>
@@ -644,7 +650,7 @@ ${appUrl}`
             </label>
             <label>
               マーカー間距離 m
-              <input type="number" value={distanceM} onChange={(e) => setDistanceM(Number(e.target.value))} step="0.01" min="0.1" />
+              <input type="number" value={inputNumberValue(distanceM)} onChange={(e) => setDistanceM(parseOptionalPositiveNumber(e.target.value, distanceM))} step="0.01" min="0.1" />
             </label>
           </div>
           <div className="guide-block">
@@ -670,7 +676,7 @@ ${appUrl}`
           <div className="form-grid">
             <label>
               読み込みFPS
-              <input type="number" value={fps} onChange={(e) => handleFpsChange(Number(e.target.value))} step="0.01" min="1" />
+              <input type="number" value={inputNumberValue(fps)} onChange={(e) => handleFpsChange(parseOptionalPositiveNumber(e.target.value, fps))} step="0.01" min="1" />
               <p className="field-help">FPSが誤っている場合のみ、ここを手入力で修正してください。小数点以下第2位まで扱います。</p>
             </label>
             <label>
