@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 import './styles.css'
 import { calculateSprintResult, createEmptyFrameSelection, validateFrames } from './calculator'
 import type { AthleteInfo, Direction, FirstStepFoot, FrameKey, FrameStep, SequenceImage, Sex } from './types'
@@ -226,6 +227,7 @@ function App({ language = 'ja' }: { language?: Language }) {
   const [message, setMessage] = useState('')
   const [isWorking, setIsWorking] = useState(false)
   const [lastSequenceSignature, setLastSequenceSignature] = useState('')
+  const analysisCompletedSignatureRef = useRef('')
 
   const totalFrames = useMemo(() => Math.max(0, Math.floor(duration * fps)), [duration, fps])
   const currentStep = FRAME_STEPS[stepIndex]
@@ -248,6 +250,17 @@ function App({ language = 'ja' }: { language?: Language }) {
       return null
     }
   }, [athlete, distanceM, fps, frames, firstStepFoot, frameErrors])
+
+  useEffect(() => {
+    if (!result) return
+    const signature = FRAME_STEPS.map((step) => frames[step.key]).join('|')
+    if (!signature || signature === analysisCompletedSignatureRef.current) return
+    analysisCompletedSignatureRef.current = signature
+    track('analysis_completed', {
+      analysis_type: 'top_speed',
+      language,
+    })
+  }, [result, frames, language])
 
   useEffect(() => {
     return () => {
@@ -303,6 +316,7 @@ function App({ language = 'ja' }: { language?: Language }) {
 
   const handleVideoChange = async (file: File | null) => {
     if (!file) return
+    track('video_uploaded', { analysis_type: 'top_speed', language })
     if (videoUrl) URL.revokeObjectURL(videoUrl)
     const url = URL.createObjectURL(file)
     setVideoUrl(url)
@@ -508,6 +522,7 @@ function App({ language = 'ja' }: { language?: Language }) {
     try {
       const dataUrl = await createTopSpeedResultDataUrl()
       downloadDataUrl(dataUrl, `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`)
+      track('result_image_saved', { analysis_type: 'top_speed', language })
       setMessage('結果シート画像を保存しました。')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '結果画像を保存できませんでした。')
@@ -546,12 +561,14 @@ ${appUrl}`
         const file = new File([dataUrlToBlob(dataUrl)], `top-speed-result-${new Date().toISOString().slice(0, 10)}.png`, { type: 'image/png' })
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl, files: [file] })
+          track('sns_shared', { analysis_type: 'top_speed', language, with_image: 'true' })
           setMessage('共有メニューを開きました。')
           return
         }
       }
       if (navigator.share) {
         await navigator.share({ title: language === 'en' ? 'Top Speed Analysis Result' : 'トップスピード分析結果', text: shareText, url: appUrl })
+        track('sns_shared', { analysis_type: 'top_speed', language, with_image: 'false' })
         setMessage('共有メニューを開きました。画像は必要に応じて別途保存してください。')
       } else {
         await navigator.clipboard.writeText(shareText)

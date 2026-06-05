@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { track } from '@vercel/analytics'
 import './styles.css'
 import TopSpeedAnalyzer from './TopSpeedAnalyzer'
 import { getInitialLanguage, installStaticTranslator, languageNames, saveLanguage, ui, type Language } from './i18n'
@@ -30,9 +31,11 @@ function AddToHomeScreenCard({ language }: { language: Language }) {
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault()
+      track('pwa_install_prompt_available', { language })
       setInstallPrompt(event as BeforeInstallPromptEventLike)
     }
     const onAppInstalled = () => {
+      track('pwa_installed', { language })
       setInstallPrompt(null)
       setIsStandalone(true)
     }
@@ -43,12 +46,14 @@ function AddToHomeScreenCard({ language }: { language: Language }) {
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
       window.removeEventListener('appinstalled', onAppInstalled)
     }
-  }, [])
+  }, [language])
 
   const install = async () => {
     if (!installPrompt) return
+    track('pwa_install_button_clicked', { language })
     await installPrompt.prompt()
-    await installPrompt.userChoice.catch(() => undefined)
+    const choice = await installPrompt.userChoice.catch(() => undefined)
+    if (choice?.outcome) track('pwa_install_choice', { language, outcome: choice.outcome })
     setInstallPrompt(null)
   }
 
@@ -93,9 +98,15 @@ export default function App() {
   }, [language, mode])
 
   const switchMode = (nextMode: AppMode) => {
+    if (nextMode !== mode) track('analysis_tab_selected', { analysis_type: nextMode === 'baton' ? 'baton' : 'top_speed', language })
     setMode(nextMode)
     const nextHash = nextMode === 'baton' ? '#baton' : '#top-speed'
     if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash)
+  }
+
+  const changeLanguage = (nextLanguage: Language) => {
+    if (nextLanguage !== language) track('language_changed', { language: nextLanguage })
+    setLanguage(nextLanguage)
   }
 
   return (
@@ -103,8 +114,8 @@ export default function App() {
       <div className="analysis-switch-shell">
         <div className="language-switch" aria-label={ui[language].language}>
           <span>{ui[language].language}</span>
-          <button type="button" className={language === 'ja' ? 'active' : ''} onClick={() => setLanguage('ja')}>{languageNames.ja}</button>
-          <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>{languageNames.en}</button>
+          <button type="button" className={language === 'ja' ? 'active' : ''} onClick={() => changeLanguage('ja')}>{languageNames.ja}</button>
+          <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => changeLanguage('en')}>{languageNames.en}</button>
         </div>
         <AddToHomeScreenCard language={language} />
         <div className="analysis-switch" role="tablist" aria-label="分析機能の切り替え">
