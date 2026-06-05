@@ -198,14 +198,25 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     if (flashOffTimeoutRef.current !== null) window.clearTimeout(flashOffTimeoutRef.current)
     flashOffTimeoutRef.current = window.setTimeout(() => {
       if (runId === currentRunRef.current) setIsFlashing(false)
-    }, 420)
+    }, 700)
   }
 
   const scheduleScreenFlash = (runId: number, context: AudioContext, signalTime: number) => {
     if (!screenFlashEnabled) return
     if (flashTimeoutRef.current !== null) window.clearTimeout(flashTimeoutRef.current)
-    const delayMs = Math.max(0, (signalTime - context.currentTime) * 1000)
-    flashTimeoutRef.current = window.setTimeout(() => triggerScreenFlash(runId), delayMs)
+
+    const tick = () => {
+      if (runId !== currentRunRef.current || !screenFlashEnabled) return
+      const remainingMs = (signalTime - context.currentTime) * 1000
+      if (remainingMs <= 8) {
+        triggerScreenFlash(runId)
+        flashTimeoutRef.current = null
+        return
+      }
+      flashTimeoutRef.current = window.setTimeout(tick, Math.min(remainingMs - 6, 16))
+    }
+
+    tick()
   }
 
   const setCountdown = (runId: number, contextStartTime: number, setTime: number, signalTime: number) => {
@@ -258,12 +269,14 @@ function Starter({ language = 'ja' }: { language?: Language }) {
 
       scheduleBuffer(context, buffers.onMarks, now, 1.0)
       scheduleBuffer(context, buffers.set, setTime, 1.0)
+      // Start signal sound is scheduled at signalTime.
       scheduleBuffer(context, buffers.startSignal, signalTime, 1.5)
-      scheduleScreenFlash(runId, context, signalTime)
 
       setStatus('running')
       setMessage(text.running)
       setCountdown(runId, now, setTime, signalTime)
+      // Screen flash uses the same signalTime as the start signal sound.
+      scheduleScreenFlash(runId, context, signalTime)
       track('starter_started', {
         language,
         on_marks_to_set_sec: String(safeOnMarksToSet),
