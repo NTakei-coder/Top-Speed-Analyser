@@ -201,6 +201,11 @@ function TopSpeedGuideGraphic({ language }: { language: Language }) {
 
 function App({ language = 'ja' }: { language?: Language }) {
   const topText = ui[language]
+  const MAX_TOTAL_CROP_PERCENT = 99
+  const MAX_SINGLE_CROP_PERCENT = 99
+  const clampCropPairValue = (value: number, other: number) =>
+    Math.max(0, Math.min(MAX_SINGLE_CROP_PERCENT, Math.min(value, MAX_TOTAL_CROP_PERCENT - other)))
+
   const inputNumberValue = (value: number) => Number.isFinite(value) && value > 0 ? String(value) : ''
   const parseOptionalPositiveNumber = (value: string, fallback: number) => {
     if (value.trim() === '') return 0
@@ -441,10 +446,19 @@ function App({ language = 'ja' }: { language?: Language }) {
       prev.map((image) => {
         if (image.id !== id) return image
         const other = key === 'cropLeftPercent' ? image.cropRightPercent : image.cropLeftPercent
-        const clampedValue = Math.max(0, Math.min(60, Math.min(value, 85 - other)))
+        const clampedValue = clampCropPairValue(value, other)
         return { ...image, [key]: clampedValue }
       }),
     )
+  }
+
+  const updateVerticalCrop = (key: 'top' | 'bottom', value: number) => {
+    setSequenceStripUrl(null)
+    if (key === 'top') {
+      setTopCropPercent(clampCropPairValue(value, bottomCropPercent))
+    } else {
+      setBottomCropPercent(clampCropPairValue(value, topCropPercent))
+    }
   }
 
   const moveToNextTrimImage = () => {
@@ -456,10 +470,10 @@ function App({ language = 'ja' }: { language?: Language }) {
       if (current && target) {
         const deltaLeft = direction === 'ltr' ? 1 : -1
         const deltaRight = direction === 'ltr' ? -1 : 1
-        const proposedLeft = Math.max(0, Math.min(60, current.cropLeftPercent + deltaLeft))
-        const proposedRight = Math.max(0, Math.min(60, current.cropRightPercent + deltaRight))
+        const proposedLeft = Math.max(0, Math.min(MAX_SINGLE_CROP_PERCENT, current.cropLeftPercent + deltaLeft))
+        const proposedRight = Math.max(0, Math.min(MAX_SINGLE_CROP_PERCENT, current.cropRightPercent + deltaRight))
         const total = proposedLeft + proposedRight
-        const adjustedRight = total > 85 ? Math.max(0, 85 - proposedLeft) : proposedRight
+        const adjustedRight = total > MAX_TOTAL_CROP_PERCENT ? Math.max(0, MAX_TOTAL_CROP_PERCENT - proposedLeft) : proposedRight
         next[trimIndex + 1] = {
           ...target,
           cropLeftPercent: proposedLeft,
@@ -894,21 +908,21 @@ ${appUrl}`
                 <div className="trim-controls">
                   <label>
                     左から何%切り取るか：{currentTrimImage.cropLeftPercent}%
-                    <input type="range" min="0" max="60" value={currentTrimImage.cropLeftPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropLeftPercent', Number(e.target.value))} />
+                    <input type="range" min="0" max="99" value={currentTrimImage.cropLeftPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropLeftPercent', Number(e.target.value))} />
                   </label>
                   <label>
                     右から何%切り取るか：{currentTrimImage.cropRightPercent}%
-                    <input type="range" min="0" max="60" value={60 - currentTrimImage.cropRightPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropRightPercent', 60 - Number(e.target.value))} />
+                    <input type="range" min="0" max="99" value={99 - currentTrimImage.cropRightPercent} onChange={(e) => updateCrop(currentTrimImage.id, 'cropRightPercent', 99 - Number(e.target.value))} />
                   </label>
                   {trimIndex === 0 && (
                     <>
                       <label>
                         上から何%切り取るか：{topCropPercent}%
-                        <input type="range" min="0" max="40" value={topCropPercent} onChange={(e) => { setTopCropPercent(Number(e.target.value)); setSequenceStripUrl(null) }} />
+                        <input type="range" min="0" max="99" value={topCropPercent} onChange={(e) => updateVerticalCrop('top', Number(e.target.value))} />
                       </label>
                       <label>
                         下から何%切り取るか：{bottomCropPercent}%
-                        <input type="range" min="0" max="40" value={bottomCropPercent} onChange={(e) => { setBottomCropPercent(Number(e.target.value)); setSequenceStripUrl(null) }} />
+                        <input type="range" min="0" max="99" value={bottomCropPercent} onChange={(e) => updateVerticalCrop('bottom', Number(e.target.value))} />
                       </label>
                     </>
                   )}
