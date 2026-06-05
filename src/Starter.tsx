@@ -55,10 +55,10 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const currentRunRef = useRef(0)
 
   const text = useMemo(() => ({
-    title: isEn ? 'Starter' : 'スターター',
+    title: isEn ? 'Start Practice Tool' : 'スタート練習ツール',
     subtitle: isEn
-      ? 'Play the start sequence using On your marks, Set, and the selected start signal.'
-      : 'On your marks、Set、選択したスタート音を使ってスタート合図を再生します。',
+      ? 'Automatically plays On your marks, Set, and the start signal so it can be used as a start cue.'
+      : 'On your marks、Set、スタート音を自動で再生し、スタートの合図として使うことができます。',
     settings: isEn ? 'Settings' : '設定',
     onMarksToSet: isEn ? 'On your marks → Set interval' : 'On your marks → Set までの時間',
     seconds: isEn ? 'seconds' : '秒',
@@ -66,9 +66,9 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     randomTiming: isEn ? 'Random: 2.00 ± 0.25 s, in 0.05 s steps' : 'ランダム：2.00 ± 0.25秒、0.05秒刻み',
     start: isEn ? 'Start sequence' : 'スタート開始',
     stop: isEn ? 'Stop / reset' : '停止 / リセット',
-    testOnMarks: isEn ? 'Test On your marks' : 'On your marks確認',
-    testSet: isEn ? 'Test Set' : 'Set確認',
-    testSignal: isEn ? 'Test start signal' : 'スタート音確認',
+    testOnMarks: isEn ? 'On your marks' : 'On your marks',
+    testSet: isEn ? 'Set' : 'Set',
+    testSignal: isEn ? 'Start signal' : 'スタート音',
     loading: isEn ? 'Loading audio...' : '音源を読み込み中です...',
     ready: isEn ? 'Ready' : '準備完了',
     running: isEn ? 'Running' : '実行中',
@@ -222,7 +222,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
 
       scheduleBuffer(context, buffers.onMarks, now, 1.0)
       scheduleBuffer(context, buffers.set, setTime, 1.0)
-      scheduleBuffer(context, buffers.startSignal, signalTime, 1.0)
+      scheduleBuffer(context, buffers.startSignal, signalTime, 1.5)
 
       setStatus('running')
       setMessage(text.running)
@@ -245,7 +245,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       const { context, buffers } = await ensureBuffers()
       stopSources()
       const now = context.currentTime + 0.05
-      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.0 : 1.0)
+      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 1.5 : 1.0)
       setMessage(text.ready)
       setStatus('idle')
       track('starter_test_sound', { language, sound: kind })
