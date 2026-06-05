@@ -9,6 +9,7 @@ export const ui = {
   ja: {
     topSpeedTab: 'トップスピード分析',
     batonTab: 'バトンパス分析',
+    starterTab: 'スターター',
     language: '表示言語',
     topSpeedTitle: 'トップスピード分析',
     batonTitle: 'バトンパス分析',
@@ -19,6 +20,7 @@ export const ui = {
   en: {
     topSpeedTab: 'Top Speed Analysis',
     batonTab: 'Baton Exchange Analysis',
+    starterTab: 'Starter',
     language: 'Language',
     topSpeedTitle: 'Top Speed Analysis',
     batonTitle: 'Baton Exchange Analysis',

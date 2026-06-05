@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import './styles.css'
 import TopSpeedAnalyzer from './TopSpeedAnalyzer'
+import Starter from './Starter'
 import { getInitialLanguage, installStaticTranslator, languageNames, saveLanguage, ui, type Language } from './i18n'
 
-type AppMode = 'top-speed' | 'baton'
+type AppMode = 'top-speed' | 'baton' | 'starter'
 
 type BeforeInstallPromptEventLike = Event & {
   prompt: () => Promise<void>
@@ -13,7 +14,9 @@ type BeforeInstallPromptEventLike = Event & {
 
 function getInitialMode(): AppMode {
   if (typeof window === 'undefined') return 'top-speed'
-  return window.location.hash === '#baton' ? 'baton' : 'top-speed'
+  if (window.location.hash === '#baton') return 'baton'
+  if (window.location.hash === '#starter') return 'starter'
+  return 'top-speed'
 }
 
 
@@ -98,9 +101,9 @@ export default function App() {
   }, [language, mode])
 
   const switchMode = (nextMode: AppMode) => {
-    if (nextMode !== mode) track('analysis_tab_selected', { analysis_type: nextMode === 'baton' ? 'baton' : 'top_speed', language })
+    if (nextMode !== mode) track('analysis_tab_selected', { analysis_type: nextMode === 'baton' ? 'baton' : nextMode === 'starter' ? 'starter' : 'top_speed', language })
     setMode(nextMode)
-    const nextHash = nextMode === 'baton' ? '#baton' : '#top-speed'
+    const nextHash = nextMode === 'baton' ? '#baton' : nextMode === 'starter' ? '#starter' : '#top-speed'
     if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash)
   }
 
@@ -137,11 +140,22 @@ export default function App() {
           >
             {ui[language].batonTab}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'starter'}
+            className={mode === 'starter' ? 'active' : ''}
+            onClick={() => switchMode('starter')}
+          >
+            {ui[language].starterTab}
+          </button>
         </div>
       </div>
 
       {mode === 'top-speed' ? (
         <TopSpeedAnalyzer language={language} />
+      ) : mode === 'starter' ? (
+        <Starter language={language} />
       ) : (
         <iframe
           className="baton-analysis-frame"
