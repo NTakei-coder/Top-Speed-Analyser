@@ -4,6 +4,16 @@ const requiredKeys = [
   'marker1', 'td1', 'to1', 'td2', 'to2', 'td3', 'to3', 'td4', 'to4', 'td5', 'marker2'
 ] as const
 
+// Validation policy:
+// - marker1 must be earlier than marker2 because marker split time depends on their order.
+// - touchdown/toe-off frames are allowed to occur before marker1 or after marker2.
+//   This handles cases where the athlete steps over a marker.
+// - only the touchdown/toe-off sequence itself must remain chronological.
+
+const stepSequenceKeys = [
+  'td1', 'to1', 'td2', 'to2', 'td3', 'to3', 'td4', 'to4', 'td5'
+] as const
+
 function value(frames: FrameSelection, key: (typeof requiredKeys)[number]): number {
   const v = frames[key]
   if (v === null || Number.isNaN(v)) {
@@ -19,16 +29,20 @@ function avg(values: number[]): number {
 
 export function validateFrames(frames: FrameSelection): string[] {
   const errors: string[] = []
-  const values = requiredKeys.map((key) => ({ key, frame: frames[key] }))
 
-  for (const item of values) {
-    if (item.frame === null) errors.push(`${item.key} が未登録です。`)
+  for (const key of requiredKeys) {
+    if (frames[key] === null) errors.push(`${key} が未登録です。`)
   }
 
-  const registered = values.filter((item): item is { key: typeof requiredKeys[number]; frame: number } => item.frame !== null)
-  for (let i = 1; i < registered.length; i += 1) {
-    if (registered[i].frame <= registered[i - 1].frame) {
-      errors.push(`${registered[i].key} は ${registered[i - 1].key} より後のフレームである必要があります。`)
+  if (frames.marker1 !== null && frames.marker2 !== null && frames.marker2 <= frames.marker1) {
+    errors.push('marker2 は marker1 より後のフレームである必要があります。')
+  }
+
+  const stepValues = stepSequenceKeys.map((key) => ({ key, frame: frames[key] }))
+  const registeredSteps = stepValues.filter((item): item is { key: typeof stepSequenceKeys[number]; frame: number } => item.frame !== null)
+  for (let i = 1; i < registeredSteps.length; i += 1) {
+    if (registeredSteps[i].frame <= registeredSteps[i - 1].frame) {
+      errors.push(`${registeredSteps[i].key} は ${registeredSteps[i - 1].key} より後のフレームである必要があります。`)
     }
   }
 
