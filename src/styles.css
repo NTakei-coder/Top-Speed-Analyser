@@ -1714,14 +1714,14 @@ video::-webkit-media-controls-start-playback-button {
   inset: 0;
   z-index: 999999;
   pointer-events: none;
-  background: #ffffff;
-  animation: starterScreenFlash 420ms ease-out forwards;
+  background: #22c55e;
+  animation: starterScreenFlash 700ms ease-out forwards;
 }
 
 @keyframes starterScreenFlash {
   0% { opacity: 0; }
-  8% { opacity: 1; }
-  55% { opacity: 1; }
+  5% { opacity: 1; }
+  65% { opacity: 1; }
   100% { opacity: 0; }
 }
 

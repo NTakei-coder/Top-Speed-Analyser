@@ -847,14 +847,23 @@ export default function RelayBatonAnalyzerPrototype({ language = "ja" } = {}) {
 
   const renderHeightInput = (fieldKey, labelJa, labelEn) => {
     if (isEn && (heightUnit === "ftin" || heightUnit === "ft/in")) {
+      const isBlank = String(form[fieldKey] ?? "").trim() === "";
       const current = cmToFeetInches(form[fieldKey]);
+      const updateFeetInches = (nextFeet, nextInches) => {
+        if (String(nextFeet ?? "").trim() === "" && String(nextInches ?? "").trim() === "") {
+          setField(fieldKey, "");
+          return;
+        }
+        const cm = feetInchesToCm(nextFeet, nextInches);
+        setField(fieldKey, Number.isFinite(cm) ? String(cm) : "");
+      };
       return (
         <label className="block">
           <span className="text-xs font-medium text-slate-500">{labelEn}</span>
           <div className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 focus-within:border-slate-400">
-            <input type="number" value={current.feet} onChange={(event) => setField(fieldKey, String(feetInchesToCm(event.target.value, current.inches)))} inputMode="decimal" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
+            <input type="number" value={isBlank || !current.feet ? "" : current.feet} onChange={(event) => updateFeetInches(event.target.value, current.inches)} inputMode="decimal" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
             <span className="text-xs text-slate-400">ft</span>
-            <input type="number" value={current.inches} onChange={(event) => setField(fieldKey, String(feetInchesToCm(current.feet, event.target.value)))} inputMode="decimal" step="0.1" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
+            <input type="number" value={isBlank || !current.inches ? "" : current.inches} onChange={(event) => updateFeetInches(current.feet, event.target.value)} inputMode="decimal" step="0.1" className="w-full bg-transparent py-3 text-base font-semibold outline-none" />
             <span className="text-xs text-slate-400">in</span>
           </div>
         </label>
