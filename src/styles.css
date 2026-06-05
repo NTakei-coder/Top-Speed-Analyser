@@ -1665,3 +1665,73 @@ video::-webkit-media-controls-start-playback-button {
     padding-right: 12px;
   }
 }
+
+/* v43 Starter screen flash */
+.starter-flash-card {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.starter-flash-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.starter-flash-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.starter-flash-toggle {
+  min-width: 92px;
+  min-height: 46px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #94a3b8;
+  color: #ffffff;
+  font-weight: 950;
+  box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.16);
+}
+
+.starter-flash-toggle.active {
+  background: #16a34a;
+  border-color: #15803d;
+}
+
+.starter-screen-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  pointer-events: none;
+  background: #ffffff;
+  animation: starterScreenFlash 420ms ease-out forwards;
+}
+
+@keyframes starterScreenFlash {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  55% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 720px) {
+  .starter-flash-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .starter-flash-toggle {
+    width: 100%;
+  }
+}

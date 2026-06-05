@@ -46,12 +46,16 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const [nextCue, setNextCue] = useState('')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [lastStartDelay, setLastStartDelay] = useState<number | null>(null)
+  const [screenFlashEnabled, setScreenFlashEnabled] = useState(false)
+  const [isFlashing, setIsFlashing] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const buffersRef = useRef<AudioBuffers | null>(null)
   const sourcesRef = useRef<ScheduledSource[]>([])
   const countdownIntervalRef = useRef<number | null>(null)
   const finishTimeoutRef = useRef<number | null>(null)
+  const flashTimeoutRef = useRef<number | null>(null)
+  const flashOffTimeoutRef = useRef<number | null>(null)
   const currentRunRef = useRef(0)
 
   const text = useMemo(() => ({
@@ -84,6 +88,12 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       ? 'For reliable timing, turn off silent mode, use sufficient volume, and avoid Bluetooth speakers or earbuds because they may add latency.'
       : '安定したタイミングのため、マナーモードを解除し、十分な音量にしてください。Bluetoothスピーカーやイヤホンは遅延が生じる場合があります。',
     timingPreview: isEn ? 'Last randomized Set → signal interval' : '直近の Set → スタート音 間隔',
+    screenFlash: isEn ? 'Screen flash' : '画面フラッシュ',
+    screenFlashOn: isEn ? 'ON' : 'ON',
+    screenFlashOff: isEn ? 'OFF' : 'OFF',
+    screenFlashDescription: isEn
+      ? 'When enabled, the screen flashes at the start signal so the timekeeper can see the start cue.'
+      : '画面フラッシュを使うと画面が発光し、計測者にスタート合図を送れます。',
   }), [isEn])
 
   useEffect(() => {
@@ -128,6 +138,15 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       window.clearTimeout(finishTimeoutRef.current)
       finishTimeoutRef.current = null
     }
+    if (flashTimeoutRef.current !== null) {
+      window.clearTimeout(flashTimeoutRef.current)
+      flashTimeoutRef.current = null
+    }
+    if (flashOffTimeoutRef.current !== null) {
+      window.clearTimeout(flashOffTimeoutRef.current)
+      flashOffTimeoutRef.current = null
+    }
+    setIsFlashing(false)
   }
 
   const stopSources = () => {
@@ -170,6 +189,23 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       sourcesRef.current = sourcesRef.current.filter((item) => item !== source)
     }
     return source
+  }
+
+  const triggerScreenFlash = (runId: number) => {
+    if (runId !== currentRunRef.current || !screenFlashEnabled) return
+    setIsFlashing(true)
+    track('starter_screen_flash_triggered', { language })
+    if (flashOffTimeoutRef.current !== null) window.clearTimeout(flashOffTimeoutRef.current)
+    flashOffTimeoutRef.current = window.setTimeout(() => {
+      if (runId === currentRunRef.current) setIsFlashing(false)
+    }, 420)
+  }
+
+  const scheduleScreenFlash = (runId: number, context: AudioContext, signalTime: number) => {
+    if (!screenFlashEnabled) return
+    if (flashTimeoutRef.current !== null) window.clearTimeout(flashTimeoutRef.current)
+    const delayMs = Math.max(0, (signalTime - context.currentTime) * 1000)
+    flashTimeoutRef.current = window.setTimeout(() => triggerScreenFlash(runId), delayMs)
   }
 
   const setCountdown = (runId: number, contextStartTime: number, setTime: number, signalTime: number) => {
@@ -223,6 +259,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       scheduleBuffer(context, buffers.onMarks, now, 1.0)
       scheduleBuffer(context, buffers.set, setTime, 1.0)
       scheduleBuffer(context, buffers.startSignal, signalTime, 1.5)
+      scheduleScreenFlash(runId, context, signalTime)
 
       setStatus('running')
       setMessage(text.running)
@@ -256,8 +293,15 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     }
   }
 
+  const toggleScreenFlash = () => {
+    const nextValue = !screenFlashEnabled
+    setScreenFlashEnabled(nextValue)
+    track('starter_screen_flash_toggled', { language, enabled: String(nextValue) })
+  }
+
   return (
     <main className="starter-page">
+      {isFlashing ? <div className="starter-screen-flash" aria-hidden="true" /> : null}
       <section className="starter-hero">
         <div>
           <p className="starter-kicker">{isEn ? 'Sprint Tools' : 'Sprint Tools'}</p>
@@ -292,6 +336,21 @@ function Starter({ language = 'ja' }: { language?: Language }) {
               <p>{text.timingPreview}: {lastStartDelay.toFixed(2)} s</p>
             ) : null}
           </div>
+        </div>
+
+        <div className="starter-flash-card">
+          <div>
+            <strong>{text.screenFlash}</strong>
+            <p>{text.screenFlashDescription}</p>
+          </div>
+          <button
+            type="button"
+            className={`starter-flash-toggle ${screenFlashEnabled ? 'active' : ''}`}
+            onClick={toggleScreenFlash}
+            aria-pressed={screenFlashEnabled}
+          >
+            {screenFlashEnabled ? text.screenFlashOn : text.screenFlashOff}
+          </button>
         </div>
 
         <div className={`starter-status starter-status-${status}`}>
