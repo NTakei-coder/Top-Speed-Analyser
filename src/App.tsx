@@ -3,9 +3,10 @@ import { track } from '@vercel/analytics'
 import './styles.css'
 import TopSpeedAnalyzer from './TopSpeedAnalyzer'
 import Starter from './Starter'
+import TrainingTimer from './TrainingTimer'
 import { getInitialLanguage, installStaticTranslator, languageNames, saveLanguage, ui, type Language } from './i18n'
 
-type AppMode = 'top-speed' | 'baton' | 'starter'
+type AppMode = 'top-speed' | 'baton' | 'starter' | 'training-timer'
 
 type BeforeInstallPromptEventLike = Event & {
   prompt: () => Promise<void>
@@ -16,6 +17,7 @@ function getInitialMode(): AppMode {
   if (typeof window === 'undefined') return 'top-speed'
   if (window.location.hash === '#baton') return 'baton'
   if (window.location.hash === '#starter') return 'starter'
+  if (window.location.hash === '#timer') return 'training-timer'
   return 'top-speed'
 }
 
@@ -101,9 +103,9 @@ export default function App() {
   }, [language, mode])
 
   const switchMode = (nextMode: AppMode) => {
-    if (nextMode !== mode) track('analysis_tab_selected', { analysis_type: nextMode === 'baton' ? 'baton' : nextMode === 'starter' ? 'starter' : 'top_speed', language })
+    if (nextMode !== mode) track('analysis_tab_selected', { analysis_type: nextMode === 'baton' ? 'baton' : nextMode === 'starter' ? 'starter' : nextMode === 'training-timer' ? 'training_timer' : 'top_speed', language })
     setMode(nextMode)
-    const nextHash = nextMode === 'baton' ? '#baton' : nextMode === 'starter' ? '#starter' : '#top-speed'
+    const nextHash = nextMode === 'baton' ? '#baton' : nextMode === 'starter' ? '#starter' : nextMode === 'training-timer' ? '#timer' : '#top-speed'
     if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash)
   }
 
@@ -149,6 +151,15 @@ export default function App() {
           >
             {ui[language].starterTab}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'training-timer'}
+            className={mode === 'training-timer' ? 'active' : ''}
+            onClick={() => switchMode('training-timer')}
+          >
+            {ui[language].trainingTimerTab}
+          </button>
         </div>
       </div>
 
@@ -156,6 +167,8 @@ export default function App() {
         <TopSpeedAnalyzer language={language} />
       ) : mode === 'starter' ? (
         <Starter language={language} />
+      ) : mode === 'training-timer' ? (
+        <TrainingTimer language={language} />
       ) : (
         <iframe
           className="baton-analysis-frame"
