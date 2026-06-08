@@ -199,6 +199,177 @@ function TopSpeedGuideGraphic({ language }: { language: Language }) {
   )
 }
 
+
+type AutoDetectLeg = 'left' | 'right' | 'both'
+
+type GroundPoint = {
+  x: number
+  y: number
+}
+
+type AutoContactInterval = {
+  step: number
+  leg: 'left' | 'right'
+  touchdownFrame: number
+  toeOffFrame: number
+  contactTime: number
+  confidence: number
+}
+
+type AutoFrameSample = {
+  frame: number
+  left?: { distance: number; confidence: number; y: number }
+  right?: { distance: number; confidence: number; y: number }
+}
+
+const POSE_LANDMARK_INDEX = {
+  leftAnkle: 27,
+  rightAnkle: 28,
+  leftHeel: 29,
+  rightHeel: 30,
+  leftFootIndex: 31,
+  rightFootIndex: 32,
+} as const
+
+function distancePointToLine(point: GroundPoint, a: GroundPoint, b: GroundPoint): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const denom = Math.hypot(dx, dy) || 1
+  return ((point.x - a.x) * dy - (point.y - a.y) * dx) / denom
+}
+
+function getLandmarkConfidence(landmark: any): number {
+  const visibility = typeof landmark?.visibility === 'number' ? landmark.visibility : 1
+  const presence = typeof landmark?.presence === 'number' ? landmark.presence : 1
+  return Math.min(visibility, presence)
+}
+
+function makeEmptyAutoFramesWithDetections(
+  currentFrames: ReturnType<typeof createEmptyFrameSelection>,
+  intervals: AutoContactInterval[],
+): ReturnType<typeof createEmptyFrameSelection> {
+  const next = { ...currentFrames }
+  const ordered = [...intervals].sort((a, b) => a.touchdownFrame - b.touchdownFrame)
+  const touchdownKeys: FrameKey[] = ['td1', 'td2', 'td3', 'td4', 'td5']
+  const toeOffKeys: FrameKey[] = ['to1', 'to2', 'to3', 'to4']
+
+  touchdownKeys.forEach((key, index) => {
+    const item = ordered[index]
+    if (item) next[key] = item.touchdownFrame
+  })
+  toeOffKeys.forEach((key, index) => {
+    const item = ordered[index]
+    if (item) next[key] = item.toeOffFrame
+  })
+  return next
+}
+
+function waitForVideoSeek(video: HTMLVideoElement, time: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('error', onError)
+    }
+    const onSeeked = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('動画のシークに失敗しました。'))
+    }
+    video.addEventListener('seeked', onSeeked, { once: true })
+    video.addEventListener('error', onError, { once: true })
+    video.currentTime = time
+  })
+}
+
+function loadVideoElement(src: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video')
+    video.src = src
+    video.crossOrigin = 'anonymous'
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.onloadedmetadata = () => resolve(video)
+    video.onerror = () => reject(new Error('動画を読み込めませんでした。'))
+  })
+}
+
+function smoothContactFlags(raw: boolean[], maxGap = 1): boolean[] {
+  const out = [...raw]
+  for (let i = 1; i < out.length - 1; i += 1) {
+    if (!out[i] && out[i - 1] && out[i + 1] && maxGap >= 1) out[i] = true
+  }
+  return out
+}
+
+function intervalsFromFlags(
+  flags: boolean[],
+  frames: number[],
+  leg: 'left' | 'right',
+  fpsValue: number,
+  confidences: number[],
+): AutoContactInterval[] {
+  const intervals: AutoContactInterval[] = []
+  let startIndex: number | null = null
+
+  for (let i = 0; i <= flags.length; i += 1) {
+    const active = i < flags.length ? flags[i] : false
+    if (active && startIndex === null) {
+      startIndex = i
+    }
+    if ((!active || i === flags.length) && startIndex !== null) {
+      const endIndex = i - 1
+      const length = endIndex - startIndex + 1
+      const minFrames = Math.max(1, Math.round(fpsValue * 0.012))
+      if (length >= minFrames) {
+        const localConf = confidences.slice(startIndex, endIndex + 1)
+        const averageConfidence = localConf.length ? localConf.reduce((sum, value) => sum + value, 0) / localConf.length : 0
+        intervals.push({
+          step: intervals.length + 1,
+          leg,
+          touchdownFrame: frames[startIndex],
+          toeOffFrame: frames[endIndex],
+          contactTime: (frames[endIndex] - frames[startIndex]) / fpsValue,
+          confidence: averageConfidence,
+        })
+      }
+      startIndex = null
+    }
+  }
+
+  return intervals
+}
+
+function createIntervalsFromSamples(
+  samples: AutoFrameSample[],
+  leg: AutoDetectLeg,
+  fpsValue: number,
+  videoHeight: number,
+  thresholdRatio = 0.018,
+): AutoContactInterval[] {
+  const threshold = Math.max(4, videoHeight * thresholdRatio)
+  const frames = samples.map((sample) => sample.frame)
+
+  const buildForLeg = (targetLeg: 'left' | 'right') => {
+    const distances = samples.map((sample) => sample[targetLeg]?.distance ?? Number.POSITIVE_INFINITY)
+    const confidences = samples.map((sample) => sample[targetLeg]?.confidence ?? 0)
+    const raw = distances.map((distance, index) => distance <= threshold && confidences[index] >= 0.45)
+    return intervalsFromFlags(smoothContactFlags(raw), frames, targetLeg, fpsValue, confidences)
+  }
+
+  const intervals = [
+    ...(leg === 'left' || leg === 'both' ? buildForLeg('left') : []),
+    ...(leg === 'right' || leg === 'both' ? buildForLeg('right') : []),
+  ]
+
+  return intervals
+    .sort((a, b) => a.touchdownFrame - b.touchdownFrame)
+    .map((item, index) => ({ ...item, step: index + 1 }))
+}
+
 function App({ language = 'ja' }: { language?: Language }) {
   const topText = ui[language]
   const MAX_TOTAL_CROP_PERCENT = 99
@@ -239,6 +410,17 @@ function App({ language = 'ja' }: { language?: Language }) {
   const [isWorking, setIsWorking] = useState(false)
   const [lastSequenceSignature, setLastSequenceSignature] = useState('')
   const analysisCompletedSignatureRef = useRef('')
+  const [autoDetectEnabled, setAutoDetectEnabled] = useState(false)
+  const [autoDetectLeg, setAutoDetectLeg] = useState<AutoDetectLeg>('both')
+  const [groundLine, setGroundLine] = useState<[GroundPoint, GroundPoint] | null>(null)
+  const [groundLineDraft, setGroundLineDraft] = useState<GroundPoint[]>([])
+  const [autoDetectIntervals, setAutoDetectIntervals] = useState<AutoContactInterval[]>([])
+  const [autoDetectSamples, setAutoDetectSamples] = useState<AutoFrameSample[]>([])
+  const [autoDetectMessage, setAutoDetectMessage] = useState('')
+  const [autoDetectProgress, setAutoDetectProgress] = useState(0)
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false)
+  const [showPoseSkeleton, setShowPoseSkeleton] = useState(false)
+  const [allowAutoDetectDataSave, setAllowAutoDetectDataSave] = useState(false)
 
   const totalFrames = useMemo(() => Math.max(0, Math.floor(duration * fps)), [duration, fps])
   const currentStep = FRAME_STEPS[stepIndex]
@@ -247,6 +429,7 @@ function App({ language = 'ja' }: { language?: Language }) {
   const frameErrors = useMemo(() => validateFrames(frames), [frames])
   const registeredCount = FRAME_STEPS.filter((step) => frames[step.key] !== null).length
   const currentTrimImage = sequenceImages[trimIndex] ?? null
+  const currentAutoContact = autoDetectIntervals.find((interval) => currentFrame >= interval.touchdownFrame && currentFrame <= interval.toeOffFrame)
   const sexLabel = athlete.sex === 'male' ? (language === 'en' ? 'Male' : '男性') : (language === 'en' ? 'Female' : '女性')
   const heightFeetInches = cmToFeetInches(athlete.heightCm)
   const sequenceItems = useMemo(() => buildSequenceItems(frames), [frames])
@@ -324,6 +507,168 @@ function App({ language = 'ja' }: { language?: Language }) {
     setBottomCropPercent(5)
     setLastSequenceSignature('')
   }
+
+
+  const resetGroundLine = () => {
+    setGroundLine(null)
+    setGroundLineDraft([])
+    setAutoDetectIntervals([])
+    setAutoDetectSamples([])
+    setAutoDetectMessage('')
+    setAutoDetectProgress(0)
+  }
+
+  const handleVideoGroundClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!autoDetectEnabled || !videoRef.current || !videoUrl) return
+    const video = videoRef.current
+    if (!video.videoWidth || !video.videoHeight) return
+    const rect = video.getBoundingClientRect()
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1) * video.videoWidth
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1) * video.videoHeight
+    const nextPoint = { x, y }
+    setGroundLineDraft((prev) => {
+      const next = prev.length >= 2 ? [nextPoint] : [...prev, nextPoint]
+      if (next.length === 2) {
+        setGroundLine([next[0], next[1]])
+        setAutoDetectMessage(language === 'en' ? 'Ground line has been set.' : '地面ラインを設定しました。')
+      } else {
+        setGroundLine(null)
+        setAutoDetectMessage(language === 'en' ? 'Click one more point on the ground line.' : '地面ライン上の2点目をクリックしてください。')
+      }
+      return next
+    })
+  }
+
+  const runAutoContactDetection = async () => {
+    if (!videoUrl) {
+      setAutoDetectMessage(language === 'en' ? 'Please select a video first.' : '先に動画を選択してください。')
+      return
+    }
+    if (!groundLine) {
+      setAutoDetectMessage(language === 'en' ? 'Please set the ground line by clicking two points on the video.' : '動画上で地面ラインの2点を指定してください。')
+      return
+    }
+    if (!Number.isFinite(fps) || fps <= 0 || !Number.isFinite(duration) || duration <= 0) {
+      setAutoDetectMessage(language === 'en' ? 'FPS or video duration is not valid.' : 'FPSまたは動画時間が正しくありません。')
+      return
+    }
+
+    setIsAutoDetecting(true)
+    setAutoDetectProgress(0)
+    setAutoDetectMessage(language === 'en' ? 'Loading Pose Landmarker...' : 'Pose Landmarkerを読み込み中です。')
+    setAutoDetectIntervals([])
+    setAutoDetectSamples([])
+
+    try {
+      const vision = await import('@mediapipe/tasks-vision')
+      const { FilesetResolver, PoseLandmarker } = vision as any
+      const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm')
+      const poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      })
+
+      const analysisVideo = await loadVideoElement(videoUrl)
+      const frameCount = Math.max(1, Math.floor(duration * fps))
+      const startFrame = 0
+      const endFrame = frameCount
+      const samples: AutoFrameSample[] = []
+      const lineA = groundLine[0]
+      const lineB = groundLine[1]
+      const videoWidth = analysisVideo.videoWidth || videoRef.current?.videoWidth || 1
+      const videoHeight = analysisVideo.videoHeight || videoRef.current?.videoHeight || 1
+
+      setAutoDetectMessage(language === 'en' ? 'Running automatic detection...' : '自動検出を実行中です。')
+
+      for (let frame = startFrame; frame <= endFrame; frame += 1) {
+        const time = frame / fps
+        await waitForVideoSeek(analysisVideo, Math.min(time, Math.max(0, duration - 0.001)))
+        const resultData = poseLandmarker.detectForVideo(analysisVideo, Math.round(time * 1000))
+        const landmarks = resultData?.landmarks?.[0]
+        const sample: AutoFrameSample = { frame }
+
+        if (landmarks) {
+          const makeFootData = (side: 'left' | 'right') => {
+            const ankle = landmarks[side === 'left' ? POSE_LANDMARK_INDEX.leftAnkle : POSE_LANDMARK_INDEX.rightAnkle]
+            const heel = landmarks[side === 'left' ? POSE_LANDMARK_INDEX.leftHeel : POSE_LANDMARK_INDEX.rightHeel]
+            const toe = landmarks[side === 'left' ? POSE_LANDMARK_INDEX.leftFootIndex : POSE_LANDMARK_INDEX.rightFootIndex]
+            if (!ankle || !heel || !toe) return undefined
+            const points = [ankle, heel, toe].map((landmark: any) => ({
+              x: landmark.x * videoWidth,
+              y: landmark.y * videoHeight,
+              confidence: getLandmarkConfidence(landmark),
+            }))
+            const distances = points.map((point) => Math.abs(distancePointToLine(point, lineA, lineB)))
+            const minDistance = Math.min(...distances)
+            const toeHeelY = Math.max(points[1].y, points[2].y)
+            return {
+              distance: minDistance,
+              confidence: Math.min(...points.map((point) => point.confidence)),
+              y: toeHeelY,
+            }
+          }
+
+          sample.left = makeFootData('left')
+          sample.right = makeFootData('right')
+        }
+
+        samples.push(sample)
+        if (frame % Math.max(1, Math.round(fps / 4)) === 0) {
+          setAutoDetectProgress(Math.round(((frame - startFrame) / Math.max(1, endFrame - startFrame)) * 100))
+          await new Promise((resolve) => window.setTimeout(resolve, 0))
+        }
+      }
+
+      const intervals = createIntervalsFromSamples(samples, autoDetectLeg, fps, videoHeight)
+      const limitedIntervals = intervals.slice(0, 5)
+      setAutoDetectSamples(samples)
+      setAutoDetectIntervals(limitedIntervals)
+      setFrames((prev) => makeEmptyAutoFramesWithDetections(prev, limitedIntervals))
+      setStepIndex((prev) => Math.min(prev, FRAME_STEPS.length - 1))
+      setAutoDetectProgress(100)
+
+      if (limitedIntervals.length > 0) {
+        setMessage(language === 'en' ? 'Automatic candidates were inserted. Please confirm them frame by frame.' : '自動候補を登録欄に反映しました。必ずコマ送りで確認してください。')
+        setAutoDetectMessage(language === 'en' ? `${limitedIntervals.length} contact phases were detected.` : `${limitedIntervals.length}個の接地区間を検出しました。`)
+        if (limitedIntervals[0]?.touchdownFrame) {
+          try {
+            setTd1Image(await captureFrameAt(videoUrl, limitedIntervals[0].touchdownFrame, fps))
+          } catch {
+            // Ignore thumbnail failure.
+          }
+        }
+      } else {
+        setAutoDetectMessage(language === 'en' ? 'No contact candidates were detected. Adjust the ground line or confirm manually.' : '接地候補を検出できませんでした。地面ラインを調整するか、手動で確認してください。')
+      }
+
+      track('auto_contact_detection_completed', {
+        analysis_type: 'top_speed',
+        language,
+        leg: autoDetectLeg,
+        detected_count: String(limitedIntervals.length),
+        data_save_allowed: String(allowAutoDetectDataSave),
+      })
+
+      await poseLandmarker.close?.()
+    } catch (error) {
+      console.error(error)
+      const fallbackMessage = language === 'en'
+        ? 'Automatic detection failed. Please confirm the frames manually.'
+        : '自動検出に失敗しました。手動でコマを確認してください。'
+      setAutoDetectMessage(error instanceof Error ? `${fallbackMessage} ${error.message}` : fallbackMessage)
+      track('auto_contact_detection_failed', { analysis_type: 'top_speed', language })
+    } finally {
+      setIsAutoDetecting(false)
+    }
+  }
+
 
   const handleVideoChange = async (file: File | null) => {
     if (!file) return
@@ -744,25 +1089,53 @@ ${appUrl}`
         </div>
 
         <div className="video-layout">
-          <div className="video-panel top-speed-video-panel">
+          <div className={`video-panel top-speed-video-panel ${autoDetectEnabled ? 'auto-detect-video-enabled' : ''}`}>
             {videoUrl ? (
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                playsInline
-                preload="metadata"
-                muted
-                disablePictureInPicture
-                controlsList="nodownload noplaybackrate nofullscreen"
-                onLoadedMetadata={(e) => {
-                  const video = e.currentTarget
-                  setDuration(video.duration || 0)
-                  video.pause()
-                  if (!videoFile) setFps(Number(getFpsPresetFromDuration(video.duration || 0).toFixed(2)))
-                }}
-                onSeeked={(e) => syncFrameFromVideoTime(e.currentTarget)}
-                onTimeUpdate={(e) => syncFrameFromVideoTime(e.currentTarget)}
-              />
+              <div className="pose-video-wrap" onClick={handleVideoGroundClick}>
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  playsInline
+                  preload="metadata"
+                  muted
+                  disablePictureInPicture
+                  controlsList="nodownload noplaybackrate nofullscreen"
+                  onLoadedMetadata={(e) => {
+                    const video = e.currentTarget
+                    setDuration(video.duration || 0)
+                    video.pause()
+                    if (!videoFile) setFps(Number(getFpsPresetFromDuration(video.duration || 0).toFixed(2)))
+                  }}
+                  onSeeked={(e) => syncFrameFromVideoTime(e.currentTarget)}
+                  onTimeUpdate={(e) => syncFrameFromVideoTime(e.currentTarget)}
+                />
+                {groundLine ? (
+                  <svg className="pose-ground-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <line
+                      x1={(groundLine[0].x / (videoRef.current?.videoWidth || 1)) * 100}
+                      y1={(groundLine[0].y / (videoRef.current?.videoHeight || 1)) * 100}
+                      x2={(groundLine[1].x / (videoRef.current?.videoWidth || 1)) * 100}
+                      y2={(groundLine[1].y / (videoRef.current?.videoHeight || 1)) * 100}
+                    />
+                  </svg>
+                ) : null}
+                {groundLineDraft.map((point, index) => (
+                  <span
+                    key={`${point.x}-${point.y}-${index}`}
+                    className="pose-ground-point"
+                    style={{
+                      left: `${(point.x / (videoRef.current?.videoWidth || 1)) * 100}%`,
+                      top: `${(point.y / (videoRef.current?.videoHeight || 1)) * 100}%`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+                {currentAutoContact ? (
+                  <div className="pose-contact-badge">
+                    {language === 'en' ? 'Contact phase' : '接地区間'}: {currentAutoContact.touchdownFrame}F – {currentAutoContact.toeOffFrame}F
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="video-placeholder">動画を選択してください</div>
             )}
@@ -794,6 +1167,106 @@ ${appUrl}`
               <input type="number" value={currentFrame} onChange={(e) => void seekToFrame(Number(e.target.value))} disabled={!videoUrl} />
             </label>
           </div>
+        </div>
+
+        <div className="auto-detect-card">
+          <div className="auto-detect-header">
+            <label className="auto-detect-toggle">
+              <input type="checkbox" checked={autoDetectEnabled} onChange={(e) => setAutoDetectEnabled(e.target.checked)} />
+              <span>{language === 'en' ? 'Auto-detect touchdown/toe-off (Beta)' : '接地・離地を自動検出する（Beta）'}</span>
+            </label>
+            <span className="auto-detect-beta">Beta</span>
+          </div>
+
+          {autoDetectEnabled ? (
+            <>
+              <p className="auto-detect-note">
+                {language === 'en'
+                  ? 'For automatic touchdown/toe-off detection, side-view footage, 120 fps or higher, and clearly visible feet are recommended. Automatic detection may be inaccurate depending on filming conditions; always confirm frame by frame.'
+                  : '接地・離地の自動判定には、横方向からの撮影、120 fps以上の動画、足部が隠れにくい映像を推奨します。自動判定は撮影条件により誤差が生じるため、必ずコマ送りで確認してください。'}
+              </p>
+              <div className="auto-detect-grid">
+                <div>
+                  <strong>{language === 'en' ? 'Ground line' : '地面ライン指定'}</strong>
+                  <p>
+                    {groundLine
+                      ? (language === 'en' ? 'Ground line set. Click reset to specify it again.' : '地面ライン設定済みです。やり直す場合はリセットしてください。')
+                      : (groundLineDraft.length === 1
+                        ? (language === 'en' ? 'Click the second point on the ground line.' : '地面ライン上の2点目をクリックしてください。')
+                        : (language === 'en' ? 'Click two points on the ground line in the video.' : '動画上で地面ライン上の2点をクリックしてください。'))}
+                  </p>
+                  <button type="button" onClick={resetGroundLine}>{language === 'en' ? 'Reset ground line' : '地面ラインをリセット'}</button>
+                </div>
+
+                <label>
+                  <strong>{language === 'en' ? 'Leg to analyze' : '解析脚'}</strong>
+                  <select value={autoDetectLeg} onChange={(e) => setAutoDetectLeg(e.target.value as AutoDetectLeg)}>
+                    <option value="both">{language === 'en' ? 'Both legs' : '両脚'}</option>
+                    <option value="left">{language === 'en' ? 'Left leg' : '左脚'}</option>
+                    <option value="right">{language === 'en' ? 'Right leg' : '右脚'}</option>
+                  </select>
+                </label>
+
+                <label className="auto-detect-check">
+                  <input type="checkbox" checked={showPoseSkeleton} onChange={(e) => setShowPoseSkeleton(e.target.checked)} />
+                  <span>{language === 'en' ? 'Show skeleton overlay when supported' : '骨格表示（対応時）'}</span>
+                </label>
+
+                <label className="auto-detect-check">
+                  <input type="checkbox" checked={allowAutoDetectDataSave} onChange={(e) => setAllowAutoDetectDataSave(e.target.checked)} />
+                  <span>{language === 'en' ? 'Allow saving non-video detection data for future improvement' : '今後の改善のため動画以外の検出データ保存を許可'}</span>
+                </label>
+              </div>
+
+              <div className="auto-detect-actions">
+                <button type="button" className="primary" onClick={() => void runAutoContactDetection()} disabled={!videoUrl || !groundLine || isAutoDetecting}>
+                  {isAutoDetecting ? (language === 'en' ? 'Detecting...' : '自動検出中...') : (language === 'en' ? 'Run auto detection' : '自動検出を実行')}
+                </button>
+                {isAutoDetecting ? <span>{autoDetectProgress}%</span> : null}
+              </div>
+
+              {autoDetectMessage ? <p className="auto-detect-message">{autoDetectMessage}</p> : null}
+
+              {autoDetectIntervals.length > 0 ? (
+                <>
+                  <div className="auto-detect-timeline" aria-label={language === 'en' ? 'Detected contact timeline' : '検出された接地区間タイムライン'}>
+                    {autoDetectIntervals.map((interval) => {
+                      const start = totalFrames > 0 ? (interval.touchdownFrame / totalFrames) * 100 : 0
+                      const end = totalFrames > 0 ? (interval.toeOffFrame / totalFrames) * 100 : start
+                      return (
+                        <div
+                          key={`${interval.step}-${interval.touchdownFrame}-${interval.toeOffFrame}`}
+                          className="auto-contact-span"
+                          style={{ left: `${start}%`, width: `${Math.max(0.5, end - start)}%` }}
+                          title={`${interval.touchdownFrame}F-${interval.toeOffFrame}F`}
+                        >
+                          <span className="td-marker" />
+                          <span className="to-marker" />
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="auto-detect-results">
+                    {autoDetectIntervals.map((interval) => (
+                      <div key={`${interval.step}-${interval.touchdownFrame}-${interval.toeOffFrame}`} className="auto-detect-result-row">
+                        <strong>{language === 'en' ? `Step ${interval.step}` : `${interval.step}歩目`}</strong>
+                        <span>{language === 'en' ? 'Touchdown' : '接地'}：{interval.touchdownFrame}F</span>
+                        <span>{language === 'en' ? 'Toe-off' : '離地'}：{interval.toeOffFrame}F</span>
+                        <span>{language === 'en' ? 'Contact time' : '接地時間'}：{formatNumber(interval.contactTime, 3)} s</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              <p className="license-note">
+                {language === 'en'
+                  ? 'Pose estimation uses MediaPipe / @mediapipe/tasks-vision (Apache License 2.0). This app is not officially affiliated with Google or MediaPipe.'
+                  : '姿勢推定には MediaPipe / @mediapipe/tasks-vision（Apache License 2.0）を使用します。本アプリはGoogleまたはMediaPipeとの公式提携を示すものではありません。'}
+              </p>
+            </>
+          ) : null}
         </div>
 
         <div className="registered-grid">
