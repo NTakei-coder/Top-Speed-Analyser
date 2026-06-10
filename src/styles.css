@@ -2358,3 +2358,132 @@ video::-webkit-media-controls-start-playback-button {
     grid-column: 1 / -1;
   }
 }
+
+
+/* v59 start video analysis UI refinements */
+.starter-video-analysis-card {
+  padding: 20px;
+}
+
+.starter-video-analysis-header p {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.starter-video-settings {
+  grid-template-columns: minmax(0, 1.7fr) minmax(160px, 0.45fr);
+  max-width: 760px;
+}
+
+.starter-analysis-video-grid {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.starter-analysis-video-panel {
+  width: 100%;
+  border-radius: 24px;
+}
+
+.starter-analysis-video-panel video {
+  width: 100%;
+  max-height: min(76vh, 760px);
+  object-fit: contain;
+}
+
+.starter-analysis-video-placeholder {
+  min-height: min(68vh, 620px);
+}
+
+.starter-analysis-control-panel {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.starter-analysis-instruction {
+  text-align: center;
+  font-size: 1.05rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.starter-frame-slider-label {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.starter-frame-controls {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.starter-frame-controls button {
+  min-height: 58px;
+  border-radius: 18px;
+  font-size: 1.1rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.starter-frame-controls button.register {
+  font-size: 1rem;
+}
+
+.starter-analysis-direct-frame {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.starter-analysis-result-time-only {
+  grid-template-columns: 1fr;
+  max-width: 420px;
+}
+
+.starter-analysis-result-time-only div {
+  background: linear-gradient(135deg, #ffffff, #eef2ff);
+  border-color: #c7d2fe;
+}
+
+.starter-analysis-result-time-only span {
+  font-size: 1rem;
+}
+
+.starter-analysis-result-time-only strong {
+  font-size: 2.1rem;
+  color: #312e81;
+}
+
+@media (max-width: 760px) {
+  .starter-frame-controls {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .starter-frame-controls button {
+    min-height: 52px;
+    padding: 0 6px;
+    font-size: 0.95rem;
+  }
+
+  .starter-frame-controls button.register {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .starter-frame-controls {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .starter-frame-controls button.register {
+    grid-column: auto;
+  }
+
+  .starter-analysis-direct-frame {
+    grid-template-columns: 1fr;
+  }
+}
