@@ -79,7 +79,6 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const [analysisCurrentFrame, setAnalysisCurrentFrame] = useState(0)
   const [flashFrame, setFlashFrame] = useState<number | null>(null)
   const [goalFrame, setGoalFrame] = useState<number | null>(null)
-  const [goalDistanceM, setGoalDistanceM] = useState(30)
   const [analysisStep, setAnalysisStep] = useState<'flash' | 'goal'>('flash')
   const [analysisMessage, setAnalysisMessage] = useState('')
 
@@ -414,7 +413,6 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const sprintTimeSec = flashFrame !== null && goalFrame !== null && goalFrame > flashFrame
     ? (goalFrame - flashFrame) / analysisFps
     : null
-  const sprintSpeed = sprintTimeSec && sprintTimeSec > 0 ? goalDistanceM / sprintTimeSec : null
 
   const resetVideoAnalysisFrames = () => {
     setAnalysisCurrentFrame(0)
@@ -591,8 +589,8 @@ function Starter({ language = 'ja' }: { language?: Language }) {
               <h2>{isEn ? 'Start video analysis' : 'スタート動画分析'}</h2>
               <p>
                 {isEn
-                  ? 'Upload a video that includes the screen flash and the goal line. Select the flash frame and the goal-passing frame to calculate the sprint time.'
-                  : '画面フラッシュとゴール地点が映る動画をアップロードし、フラッシュが見えたコマとゴール通過コマを選択してタイムを計算します。'}
+                  ? 'Measure sprint time from video. 1) Place a marker at 10 m, 30 m, or another target distance, and film from the extension of that line. 2) Turn on screen flash and start so the camera can see the flash. 3) Upload the video, then select the flash frame and the frame where the runner passes the goal marker.'
+                  : '動画からタイム計測ができます。①10mや30mなどにマークを置き、その延長線上から動画を撮ります。②画面フラッシュをONにして、カメラにフラッシュが見えるようにスタート開始。③動画をアップロードし、フラッシュが見えたコマとゴールマークを通過したコマからタイムを計測！'}
               </p>
             </div>
           </div>
@@ -617,20 +615,6 @@ function Starter({ language = 'ja' }: { language?: Language }) {
                 value={analysisFps}
                 onChange={(event) => setAnalysisFps(Number(event.target.value) || 120)}
               />
-            </label>
-
-            <label>
-              <span>{isEn ? 'Goal distance' : 'ゴール距離'}</span>
-              <div className="starter-input-row">
-                <input
-                  type="number"
-                  min="1"
-                  step="0.1"
-                  value={goalDistanceM}
-                  onChange={(event) => setGoalDistanceM(Number(event.target.value) || 30)}
-                />
-                <strong>m</strong>
-              </div>
             </label>
           </div>
 
@@ -666,7 +650,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
               <div className={`starter-analysis-instruction ${analysisStep === 'flash' ? 'flash-step' : 'goal-step'}`}>
                 {analysisStep === 'flash'
                   ? (isEn ? 'Select the first frame where the screen flash is visible.' : '画面フラッシュが見えた最初のコマを選択してください。')
-                  : (isEn ? `Select the frame where the runner passes the goal line (${goalDistanceM} m).` : `ゴール地点（${goalDistanceM}m）を通過したコマを選択してください。`)}
+                  : (isEn ? 'Select the frame where the runner passes the goal marker.' : 'ゴールマークを通過したコマを選択してください。')}
               </div>
 
               <label className="starter-frame-slider-label">
@@ -723,26 +707,13 @@ function Starter({ language = 'ja' }: { language?: Language }) {
 
           {analysisMessage ? <p className="starter-analysis-message">{analysisMessage}</p> : null}
 
-          <div className="starter-analysis-result">
+          <div className="starter-analysis-result starter-analysis-result-time-only">
             <div>
               <span>{isEn ? 'Sprint time' : 'タイム'}</span>
               <strong>{sprintTimeSec !== null ? `${sprintTimeSec.toFixed(3)} s` : '-'}</strong>
             </div>
-            <div>
-              <span>{isEn ? 'Frame difference' : 'フレーム差'}</span>
-              <strong>{flashFrame !== null && goalFrame !== null && goalFrame > flashFrame ? `${goalFrame - flashFrame} F` : '-'}</strong>
-            </div>
-            <div>
-              <span>{isEn ? 'Average speed' : '平均速度'}</span>
-              <strong>{sprintSpeed !== null ? `${sprintSpeed.toFixed(2)} m/s` : '-'}</strong>
-            </div>
           </div>
 
-          <p className="starter-analysis-note">
-            {isEn
-              ? 'The result is calculated from (goal frame − flash frame) / FPS. Always confirm the selected frames with frame-by-frame controls.'
-              : 'タイムは（ゴール通過コマ − フラッシュコマ）÷ FPSで計算します。必ずコマ送りで選択コマを確認してください。'}
-          </p>
         </div>
 
         <div className="starter-rest-timer-card">
