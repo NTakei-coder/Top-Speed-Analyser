@@ -341,10 +341,10 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       const signalTime = setTime + setToSignalSec
       const signalEndWallTimeMs = Date.now() + Math.max(0, (signalTime + buffers.startSignal.duration - context.currentTime) * 1000)
 
-      scheduleBuffer(context, buffers.onMarks, now, 2.0)
-      scheduleBuffer(context, buffers.set, setTime, 2.0)
+      scheduleBuffer(context, buffers.onMarks, now, 3.0)
+      scheduleBuffer(context, buffers.set, setTime, 3.0)
       // Start signal sound is scheduled at signalTime.
-      scheduleBuffer(context, buffers.startSignal, signalTime, 3.75)
+      scheduleBuffer(context, buffers.startSignal, signalTime, 5.625)
 
       setStatus('running')
       setMessage(text.running)
@@ -372,7 +372,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       currentRunRef.current += 1
       const runId = currentRunRef.current
       const now = context.currentTime + 0.12
-      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 3.75 : 2.0)
+      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 5.625 : 3.0)
 
       if (kind === 'startSignal') {
         scheduleScreenFlash(runId, context, now)
