@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { Language } from './i18n'
+import { extractFpsFromVideoFile, seekVideo } from './videoUtils'
 
 type StarterStatus = 'idle' | 'loading' | 'running' | 'done' | 'error'
 
@@ -70,6 +71,17 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const [isFlashing, setIsFlashing] = useState(false)
   const [restTimerStartAtMs, setRestTimerStartAtMs] = useState<number | null>(() => getStoredRestTimerStart())
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [analysisVideoUrl, setAnalysisVideoUrl] = useState<string | null>(null)
+  const [analysisVideoName, setAnalysisVideoName] = useState('')
+  const [analysisDuration, setAnalysisDuration] = useState(0)
+  const [analysisFps, setAnalysisFps] = useState(120)
+  const [analysisFpsInfo, setAnalysisFpsInfo] = useState('')
+  const [analysisCurrentFrame, setAnalysisCurrentFrame] = useState(0)
+  const [flashFrame, setFlashFrame] = useState<number | null>(null)
+  const [goalFrame, setGoalFrame] = useState<number | null>(null)
+  const [goalDistanceM, setGoalDistanceM] = useState(30)
+  const [analysisStep, setAnalysisStep] = useState<'flash' | 'goal'>('flash')
+  const [analysisMessage, setAnalysisMessage] = useState('')
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const buffersRef = useRef<AudioBuffers | null>(null)
@@ -79,6 +91,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
   const flashTimeoutRef = useRef<number | null>(null)
   const flashOffTimeoutRef = useRef<number | null>(null)
   const currentRunRef = useRef(0)
+  const analysisVideoRef = useRef<HTMLVideoElement | null>(null)
 
   const text = useMemo(() => ({
     title: isEn ? 'Start Practice Tool' : 'スタート練習ツール',
@@ -131,6 +144,12 @@ function Starter({ language = 'ja' }: { language?: Language }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (analysisVideoUrl) URL.revokeObjectURL(analysisVideoUrl)
+    }
+  }, [analysisVideoUrl])
 
   useEffect(() => {
     const updateNow = () => setNowMs(Date.now())
@@ -341,10 +360,10 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       const signalTime = setTime + setToSignalSec
       const signalEndWallTimeMs = Date.now() + Math.max(0, (signalTime + buffers.startSignal.duration - context.currentTime) * 1000)
 
-      scheduleBuffer(context, buffers.onMarks, now, 3.0)
-      scheduleBuffer(context, buffers.set, setTime, 3.0)
+      scheduleBuffer(context, buffers.onMarks, now, 3.6)
+      scheduleBuffer(context, buffers.set, setTime, 3.6)
       // Start signal sound is scheduled at signalTime.
-      scheduleBuffer(context, buffers.startSignal, signalTime, 5.625)
+      scheduleBuffer(context, buffers.startSignal, signalTime, 6.75)
 
       setStatus('running')
       setMessage(text.running)
@@ -372,7 +391,7 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       currentRunRef.current += 1
       const runId = currentRunRef.current
       const now = context.currentTime + 0.12
-      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 5.625 : 3.0)
+      scheduleBuffer(context, buffers[kind], now, kind === 'startSignal' ? 6.75 : 3.6)
 
       if (kind === 'startSignal') {
         scheduleScreenFlash(runId, context, now)
@@ -389,6 +408,99 @@ function Starter({ language = 'ja' }: { language?: Language }) {
       setMessage(text.error)
     }
   }
+
+
+  const totalAnalysisFrames = useMemo(() => Math.max(0, Math.floor(analysisDuration * analysisFps)), [analysisDuration, analysisFps])
+  const sprintTimeSec = flashFrame !== null && goalFrame !== null && goalFrame > flashFrame
+    ? (goalFrame - flashFrame) / analysisFps
+    : null
+  const sprintSpeed = sprintTimeSec && sprintTimeSec > 0 ? goalDistanceM / sprintTimeSec : null
+
+  const resetVideoAnalysisFrames = () => {
+    setAnalysisCurrentFrame(0)
+    setFlashFrame(null)
+    setGoalFrame(null)
+    setAnalysisStep('flash')
+    setAnalysisMessage('')
+  }
+
+  const syncAnalysisFrameFromVideoTime = (video: HTMLVideoElement) => {
+    setAnalysisCurrentFrame(Math.max(0, Math.round(video.currentTime * analysisFps)))
+  }
+
+  const seekToAnalysisFrame = async (frame: number) => {
+    const video = analysisVideoRef.current
+    if (!video) return
+    const safeFrame = Math.max(0, Math.min(Math.round(frame), Math.max(totalAnalysisFrames, 0)))
+    await seekVideo(video, safeFrame / analysisFps)
+    setAnalysisCurrentFrame(safeFrame)
+  }
+
+  const moveAnalysisFrame = async (delta: number) => {
+    await seekToAnalysisFrame(analysisCurrentFrame + delta)
+  }
+
+  const registerAnalysisFrame = () => {
+    if (!analysisVideoUrl) return
+    if (analysisStep === 'flash') {
+      setFlashFrame(analysisCurrentFrame)
+      setAnalysisStep('goal')
+      setAnalysisMessage(isEn ? 'Start flash frame registered. Next, select the goal-passing frame.' : 'フラッシュが見えたコマを登録しました。次にゴール地点を通過したコマを選択してください。')
+      track('starter_video_analysis_frame_registered', { language, frame_type: 'flash' })
+      return
+    }
+    setGoalFrame(analysisCurrentFrame)
+    setAnalysisMessage(isEn ? 'Goal-passing frame registered. Check the calculated time below.' : 'ゴール通過コマを登録しました。下のタイムを確認してください。')
+    track('starter_video_analysis_frame_registered', { language, frame_type: 'goal' })
+  }
+
+  const undoAnalysisFrameRegistration = () => {
+    if (analysisStep === 'goal' && goalFrame === null) {
+      setFlashFrame(null)
+      setAnalysisStep('flash')
+      setAnalysisMessage('')
+      return
+    }
+    setGoalFrame(null)
+    setAnalysisStep('goal')
+    setAnalysisMessage(isEn ? 'Goal frame cleared. Select it again.' : 'ゴール通過コマをクリアしました。もう一度選択してください。')
+  }
+
+  const jumpToAnalysisFrame = async (frame: number | null) => {
+    if (frame === null) return
+    await seekToAnalysisFrame(frame)
+  }
+
+  const handleAnalysisVideoChange = async (file: File | null) => {
+    if (analysisVideoUrl) URL.revokeObjectURL(analysisVideoUrl)
+    resetVideoAnalysisFrames()
+    setAnalysisDuration(0)
+    setAnalysisFpsInfo('')
+    if (!file) {
+      setAnalysisVideoUrl(null)
+      setAnalysisVideoName('')
+      return
+    }
+
+    const nextUrl = URL.createObjectURL(file)
+    setAnalysisVideoUrl(nextUrl)
+    setAnalysisVideoName(file.name)
+    setAnalysisMessage(isEn ? 'Video loaded. First, select the frame where the screen flash appears.' : '動画を読み込みました。まず画面フラッシュが見えたコマを選択してください。')
+    track('starter_video_analysis_uploaded', { language })
+
+    try {
+      const estimate = await extractFpsFromVideoFile(file)
+      setAnalysisFps(estimate.fps)
+      setAnalysisFpsInfo(isEn
+        ? `FPS estimated from metadata: ${estimate.fps.toFixed(2)} fps`
+        : `メタデータからFPSを推定：${estimate.fps.toFixed(2)} fps`)
+    } catch (error) {
+      setAnalysisFpsInfo(isEn
+        ? 'FPS could not be estimated automatically. Enter the shooting FPS manually.'
+        : 'FPSを自動推定できませんでした。撮影時のFPSを手入力してください。')
+    }
+  }
+
 
   const toggleScreenFlash = () => {
     const nextValue = !screenFlashEnabled
@@ -471,6 +583,166 @@ function Starter({ language = 'ja' }: { language?: Language }) {
           <button type="button" onClick={() => void testSound('onMarks')} disabled={status === 'running' || status === 'loading'}>{text.testOnMarks}</button>
           <button type="button" onClick={() => void testSound('set')} disabled={status === 'running' || status === 'loading'}>{text.testSet}</button>
           <button type="button" onClick={() => void testSound('startSignal')} disabled={status === 'running' || status === 'loading'}>{text.testSignal}</button>
+        </div>
+
+        <div className="starter-video-analysis-card">
+          <div className="starter-video-analysis-header">
+            <div>
+              <h2>{isEn ? 'Start video analysis' : 'スタート動画分析'}</h2>
+              <p>
+                {isEn
+                  ? 'Upload a video that includes the screen flash and the goal line. Select the flash frame and the goal-passing frame to calculate the sprint time.'
+                  : '画面フラッシュとゴール地点が映る動画をアップロードし、フラッシュが見えたコマとゴール通過コマを選択してタイムを計算します。'}
+              </p>
+            </div>
+          </div>
+
+          <div className="starter-video-settings">
+            <label className="starter-file-input">
+              <span>{isEn ? 'Video file' : '動画ファイル'}</span>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(event) => void handleAnalysisVideoChange(event.target.files?.[0] ?? null)}
+              />
+              {analysisVideoName ? <strong>{analysisVideoName}</strong> : null}
+            </label>
+
+            <label>
+              <span>{isEn ? 'FPS' : 'FPS'}</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                value={analysisFps}
+                onChange={(event) => setAnalysisFps(Number(event.target.value) || 120)}
+              />
+            </label>
+
+            <label>
+              <span>{isEn ? 'Goal distance' : 'ゴール距離'}</span>
+              <div className="starter-input-row">
+                <input
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  value={goalDistanceM}
+                  onChange={(event) => setGoalDistanceM(Number(event.target.value) || 30)}
+                />
+                <strong>m</strong>
+              </div>
+            </label>
+          </div>
+
+          {analysisFpsInfo ? <p className="starter-analysis-fps-info">{analysisFpsInfo}</p> : null}
+
+          <div className="starter-analysis-video-grid">
+            <div className="starter-analysis-video-panel">
+              {analysisVideoUrl ? (
+                <video
+                  ref={analysisVideoRef}
+                  src={analysisVideoUrl}
+                  playsInline
+                  preload="metadata"
+                  muted
+                  disablePictureInPicture
+                  controlsList="nodownload noplaybackrate nofullscreen"
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget
+                    setAnalysisDuration(video.duration || 0)
+                    video.pause()
+                  }}
+                  onSeeked={(event) => syncAnalysisFrameFromVideoTime(event.currentTarget)}
+                  onTimeUpdate={(event) => syncAnalysisFrameFromVideoTime(event.currentTarget)}
+                />
+              ) : (
+                <div className="starter-analysis-video-placeholder">
+                  {isEn ? 'Select a video.' : '動画を選択してください'}
+                </div>
+              )}
+            </div>
+
+            <div className="starter-analysis-control-panel">
+              <div className={`starter-analysis-instruction ${analysisStep === 'flash' ? 'flash-step' : 'goal-step'}`}>
+                {analysisStep === 'flash'
+                  ? (isEn ? 'Select the first frame where the screen flash is visible.' : '画面フラッシュが見えた最初のコマを選択してください。')
+                  : (isEn ? `Select the frame where the runner passes the goal line (${goalDistanceM} m).` : `ゴール地点（${goalDistanceM}m）を通過したコマを選択してください。`)}
+              </div>
+
+              <label className="starter-frame-slider-label">
+                {isEn ? 'Move frame position' : 'フレーム位置を移動'}
+                <input
+                  className="starter-frame-slider"
+                  type="range"
+                  min="0"
+                  max={Math.max(totalAnalysisFrames, 1)}
+                  step="1"
+                  value={Math.min(analysisCurrentFrame, Math.max(totalAnalysisFrames, 1))}
+                  onChange={(event) => void seekToAnalysisFrame(Number(event.target.value))}
+                  disabled={!analysisVideoUrl}
+                />
+              </label>
+
+              <div className="starter-frame-controls">
+                <button type="button" onClick={() => void moveAnalysisFrame(-10)} disabled={!analysisVideoUrl}>−10</button>
+                <button type="button" onClick={() => void moveAnalysisFrame(-1)} disabled={!analysisVideoUrl}>−1</button>
+                <button type="button" className="register" onClick={registerAnalysisFrame} disabled={!analysisVideoUrl}>
+                  {isEn ? 'Register' : '登録'}
+                </button>
+                <button type="button" onClick={() => void moveAnalysisFrame(1)} disabled={!analysisVideoUrl}>＋1</button>
+                <button type="button" onClick={() => void moveAnalysisFrame(10)} disabled={!analysisVideoUrl}>＋10</button>
+              </div>
+
+              <div className="starter-analysis-direct-frame">
+                <label>
+                  {isEn ? 'Frame number' : 'フレーム番号を直接指定'}
+                  <input
+                    type="number"
+                    value={analysisCurrentFrame}
+                    onChange={(event) => void seekToAnalysisFrame(Number(event.target.value))}
+                    disabled={!analysisVideoUrl}
+                  />
+                </label>
+                <button type="button" onClick={undoAnalysisFrameRegistration} disabled={flashFrame === null && goalFrame === null}>
+                  {isEn ? 'Back one step' : '1つ前の登録に戻る'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="starter-analysis-registered-grid">
+            <button type="button" onClick={() => void jumpToAnalysisFrame(flashFrame)} disabled={flashFrame === null}>
+              <span>{isEn ? 'Flash frame' : 'フラッシュコマ'}</span>
+              <strong>{flashFrame ?? '-'}</strong>
+            </button>
+            <button type="button" onClick={() => void jumpToAnalysisFrame(goalFrame)} disabled={goalFrame === null}>
+              <span>{isEn ? 'Goal frame' : 'ゴール通過コマ'}</span>
+              <strong>{goalFrame ?? '-'}</strong>
+            </button>
+          </div>
+
+          {analysisMessage ? <p className="starter-analysis-message">{analysisMessage}</p> : null}
+
+          <div className="starter-analysis-result">
+            <div>
+              <span>{isEn ? 'Sprint time' : 'タイム'}</span>
+              <strong>{sprintTimeSec !== null ? `${sprintTimeSec.toFixed(3)} s` : '-'}</strong>
+            </div>
+            <div>
+              <span>{isEn ? 'Frame difference' : 'フレーム差'}</span>
+              <strong>{flashFrame !== null && goalFrame !== null && goalFrame > flashFrame ? `${goalFrame - flashFrame} F` : '-'}</strong>
+            </div>
+            <div>
+              <span>{isEn ? 'Average speed' : '平均速度'}</span>
+              <strong>{sprintSpeed !== null ? `${sprintSpeed.toFixed(2)} m/s` : '-'}</strong>
+            </div>
+          </div>
+
+          <p className="starter-analysis-note">
+            {isEn
+              ? 'The result is calculated from (goal frame − flash frame) / FPS. Always confirm the selected frames with frame-by-frame controls.'
+              : 'タイムは（ゴール通過コマ − フラッシュコマ）÷ FPSで計算します。必ずコマ送りで選択コマを確認してください。'}
+          </p>
         </div>
 
         <div className="starter-rest-timer-card">
