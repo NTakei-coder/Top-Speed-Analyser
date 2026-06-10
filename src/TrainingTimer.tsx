@@ -157,7 +157,7 @@ function scheduleTone(context: AudioContext, when: number, kind: CueKind) {
   const gain = context.createGain()
   const duration = kind === 'long' ? 0.72 : 0.16
   const frequency = kind === 'long' ? 760 : 980
-  const volume = kind === 'long' ? 0.72 : 0.44
+  const volume = kind === 'long' ? 1.08 : 0.66
 
   oscillator.type = 'sine'
   oscillator.frequency.setValueAtTime(frequency, when)
