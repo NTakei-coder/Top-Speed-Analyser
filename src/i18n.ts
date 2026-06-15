@@ -9,6 +9,7 @@ export const ui = {
   ja: {
     topSpeedTab: 'トップスピード分析',
     batonTab: 'バトンパス分析',
+    fvProfileTab: 'F–Vプロファイル',
     starterTab: 'スタート練習ツール',
     trainingTimerTab: 'トレーニングタイマー',
     language: '表示言語',
@@ -21,6 +22,7 @@ export const ui = {
   en: {
     topSpeedTab: 'Top Speed Analysis',
     batonTab: 'Baton Exchange Analysis',
+    fvProfileTab: 'F–V Profile',
     starterTab: 'Start Practice Tool',
     trainingTimerTab: 'Training Timer',
     language: 'Language',
@@ -34,6 +36,8 @@ export const ui = {
 
 const jaToEn: Record<string, string> = {
   'トップスピード分析': 'Top Speed Analysis',
+  'F–Vプロファイル': 'F–V Profile',
+  'スプリントF–Vプロファイル': 'Sprint F–V Profile',
   'バトンパス分析': 'Baton Exchange Analysis',
   'ユーザー情報': 'User information',
   'ユーザー名': 'User name',
