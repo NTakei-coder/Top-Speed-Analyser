@@ -147,17 +147,17 @@ function getSteps(distanceMode: DistanceMode): FrameStep[] {
 }
 
 function estimateAirDensity(tempC: number, pressureHpa: number): number {
-  const pressurePa = pressureHpa * 100
-  const tempK = tempC + 273.15
-  if (!Number.isFinite(pressurePa) || !Number.isFinite(tempK) || tempK <= 0) return 1.2
-  return pressurePa / (287.05 * tempK)
+  // Excel template-compatible density formula.
+  // The trusted F–V spreadsheet uses 1.293 * (P / 760) * 273 / (273 + T) in its split-times sheet.
+  if (!Number.isFinite(pressureHpa) || !Number.isFinite(tempC)) return 1.2
+  return 1.293 * (pressureHpa / 760) * (273 / (273 + tempC))
 }
 
 function estimateFrontalArea(heightCm: number, bodyMassKg: number): number {
   const heightM = Math.max(1.0, heightCm / 100)
   const mass = Math.max(20, bodyMassKg)
-  const bodySurfaceArea = 0.20247 * Math.pow(heightM, 0.725) * Math.pow(mass, 0.425)
-  return bodySurfaceArea * 0.24
+  const bodySurfaceArea = 0.2025 * Math.pow(heightM, 0.725) * Math.pow(mass, 0.425)
+  return bodySurfaceArea * 0.266
 }
 
 function distanceModel(time: number, mss: number, tau: number): number {
@@ -287,15 +287,15 @@ function calculateFvProfile(params: {
   const mass = Math.max(20, bodyMassKg)
   const rho = estimateAirDensity(tempC, pressureHpa)
   const frontalArea = estimateFrontalArea(heightCm, bodyMassKg)
-  const cd = 1.0
+  const cd = 0.9
   const g = 9.80665
   const lastTime = splitPoints[splitPoints.length - 1].time
 
   const modelData: FvModelPoint[] = []
   const fvData: Array<{ velocity: number; forceRel: number; powerRel: number; rf: number }> = []
-  const n = 90
-  for (let i = 0; i <= n; i += 1) {
-    const time = Math.max(0.001, (lastTime * i) / n)
+  // Excel template-compatible analysis grid: 0.01–6.00 s in 0.01 s steps.
+  for (let i = 1; i <= 600; i += 1) {
+    const time = i * 0.01
     const velocity = velocityModel(time, fit.mss, fit.tau)
     const acceleration = accelerationModel(time, fit.mss, fit.tau)
     const airForceRel = (0.5 * rho * cd * frontalArea * velocity * velocity) / mass
@@ -322,7 +322,7 @@ function calculateFvProfile(params: {
   }
 
   const fvReg = regression(fvData.map((point) => point.velocity), fvData.map((point) => point.forceRel))
-  const rfTrendData = modelData.filter((point) => point.time >= 0.3 && point.velocity > 0.05 && point.forceRel > 0.05)
+  const rfTrendData = modelData.filter((point) => point.time >= 0.51 && point.velocity > 0.05 && point.forceRel > 0.05)
   const rfAnalysisData = rfTrendData.length >= 2 ? rfTrendData : modelData.filter((point) => point.velocity > 0.05 && point.forceRel > 0.05)
   const rfReg = regression(rfAnalysisData.map((point) => point.velocity), rfAnalysisData.map((point) => point.rf))
   const rfmax = rfAnalysisData.length > 0 ? Math.max(...rfAnalysisData.map((point) => point.rf)) : rfReg.intercept
@@ -528,7 +528,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
             <input type="number" step="0.1" value={tempC} onChange={(event) => setTempC(Number(event.target.value) || 20)} />
           </label>
           <label>
-            <span>{isEn ? 'Air pressure hPa' : '気圧 hPa'}</span>
+            <span>{isEn ? 'Air pressure' : '気圧'}</span>
             <input type="number" step="1" value={pressureHpa} onChange={(event) => setPressureHpa(Number(event.target.value) || 1013)} />
           </label>
         </div>
@@ -707,7 +707,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 <div className="fv-metric-head">
                   <span>RFmax</span>
                   <strong>{formatNumber(result.rfmax, 1)} %</strong>
-                  <small>{isEn ? 'Max after 0.3 s' : '0.3秒以降の最大値'}</small>
+                  <small>{isEn ? 'Max after 0.51 s' : '0.51秒以降の最大値'}</small>
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
@@ -715,8 +715,8 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
-                    ? 'RFmax is now calculated as the maximal RF after 0.3 s, rather than the regression intercept at 0 s. It estimates how effectively total force is oriented horizontally in early acceleration.'
-                    : 'RFmaxは、0秒の回帰切片ではなく、0.3秒以降のRF最大値として計算します。加速初期に発揮した力をどれだけ水平前方へ向けられているかの推定値です。'}
+                    ? 'RFmax is now calculated as the maximal RF after 0.51 s, matching the split-times spreadsheet, rather than the regression intercept at 0 s. It estimates how effectively total force is oriented horizontally in early acceleration.'
+                    : 'RFmaxは、0秒の回帰切片ではなく、スプレッドシートに合わせて0.51秒以降のRF最大値として計算します。加速初期に発揮した力をどれだけ水平前方へ向けられているかの推定値です。'}
                 </p>
               </div>
 
