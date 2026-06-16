@@ -61,6 +61,56 @@ type FvResult = {
   fvData: Array<{ velocity: number; forceRel: number; powerRel: number; rf: number }>
 }
 
+type AthleteSex = 'male' | 'female'
+
+function sexLabel(sex: AthleteSex, isEn: boolean): string {
+  if (sex === 'male') return isEn ? 'Male' : '男性'
+  return isEn ? 'Female' : '女性'
+}
+
+function guideText(metric: 'f0' | 'v0' | 'pmax' | 'rfmax' | 'drf' | 'mssTau', sex: AthleteSex, isEn: boolean): string {
+  const female = sex === 'female'
+  if (isEn) {
+    if (metric === 'f0') return female
+      ? '<6 low, 6–8 moderate/good, 8–10 high, >10 very high.'
+      : '<7 low, 7–9 moderate/good, 9–11 high, >11 very high.'
+    if (metric === 'v0') return female
+      ? '<6.5 low, 6.5–8.0 moderate/good, 8.0–9.5 high, >9.5 very high.'
+      : '<7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high.'
+    if (metric === 'pmax') return female
+      ? '<10 low, 10–15 moderate/good, 15–20 high, >20 very high.'
+      : '<13 low, 13–18 moderate/good, 18–23 high, >23 very high.'
+    if (metric === 'rfmax') return female
+      ? '<33 low, 33–43 moderate/good, >43 high. Interpret strongly with split times and technique.'
+      : '<35 low, 35–45 moderate/good, >45 high. Elite acceleration can be higher.'
+    if (metric === 'drf') return female
+      ? 'About −5 to −9 is common. More negative than −9 suggests RF drops rapidly; closer to 0 means RF is maintained better, but interpret together with RFmax.'
+      : 'About −6 to −10 is common. More negative than −10 suggests RF drops rapidly; closer to 0 means RF is maintained better, but interpret together with RFmax.'
+    return female
+      ? 'MSS: <6.5 low, 6.5–8.0 moderate/good, 8.0–9.5 high, >9.5 very high. τ is often ~0.8–1.5 s; lower τ means quicker rise toward MSS.'
+      : 'MSS: <7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high. τ is often ~0.7–1.4 s; lower τ means quicker rise toward MSS.'
+  }
+
+  if (metric === 'f0') return female
+    ? '6未満：低め、6–8：標準〜良好、8–10：高い、10超：非常に高い。'
+    : '7未満：低め、7–9：標準〜良好、9–11：高い、11超：非常に高い。'
+  if (metric === 'v0') return female
+    ? '6.5未満：低め、6.5–8.0：標準〜良好、8.0–9.5：高い、9.5超：非常に高い。'
+    : '7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。'
+  if (metric === 'pmax') return female
+    ? '10未満：低め、10–15：標準〜良好、15–20：高い、20超：非常に高い。'
+    : '13未満：低め、13–18：標準〜良好、18–23：高い、23超：非常に高い。'
+  if (metric === 'rfmax') return female
+    ? '33未満：低め、33–43：標準〜良好、43超：高い。スプリットタイムや技術と合わせて解釈してください。'
+    : '35未満：低め、35–45：標準〜良好、45超：高い。高い加速能力を持つ選手ではさらに高値になり得ます。'
+  if (metric === 'drf') return female
+    ? '−5〜−9程度がよく見られる範囲です。−9より負に大きい場合は速度上昇に伴うRF低下が大きく、0に近いほどRFを維持しやすい傾向です。ただしRFmaxとセットで解釈します。'
+    : '−6〜−10程度がよく見られる範囲です。−10より負に大きい場合は速度上昇に伴うRF低下が大きく、0に近いほどRFを維持しやすい傾向です。ただしRFmaxとセットで解釈します。'
+  return female
+    ? 'MSSは6.5未満：低め、6.5–8.0：標準〜良好、8.0–9.5：高い、9.5超：非常に高い。τは概ね0.8–1.5秒程度が目安で、小さいほどMSSへの立ち上がりが速いことを示します。'
+    : 'MSSは7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。τは概ね0.7–1.4秒程度が目安で、小さいほどMSSへの立ち上がりが速いことを示します。'
+}
+
 const ALL_STEPS: FrameStep[] = [
   {
     key: 'start',
@@ -272,7 +322,10 @@ function calculateFvProfile(params: {
   }
 
   const fvReg = regression(fvData.map((point) => point.velocity), fvData.map((point) => point.forceRel))
-  const rfReg = regression(fvData.map((point) => point.velocity), fvData.map((point) => point.rf))
+  const rfTrendData = modelData.filter((point) => point.time >= 0.3 && point.velocity > 0.05 && point.forceRel > 0.05)
+  const rfAnalysisData = rfTrendData.length >= 2 ? rfTrendData : modelData.filter((point) => point.velocity > 0.05 && point.forceRel > 0.05)
+  const rfReg = regression(rfAnalysisData.map((point) => point.velocity), rfAnalysisData.map((point) => point.rf))
+  const rfmax = rfAnalysisData.length > 0 ? Math.max(...rfAnalysisData.map((point) => point.rf)) : rfReg.intercept
   const f0Rel = Math.max(0, fvReg.intercept)
   const v0 = fvReg.slope < 0 ? Math.max(0, -fvReg.intercept / fvReg.slope) : fit.mss
   const pmaxRel = f0Rel * v0 / 4
@@ -287,7 +340,7 @@ function calculateFvProfile(params: {
     pmaxRel,
     pmaxAbs: pmaxRel * mass,
     fvSlope: fvReg.slope,
-    rfmax: rfReg.intercept,
+    rfmax,
     drf: rfReg.slope,
     maxAccel: fit.mss / fit.tau,
     airDensity: rho,
@@ -318,6 +371,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
   const isEn = language === 'en'
   const [athleteName, setAthleteName] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [athleteSex, setAthleteSex] = useState<AthleteSex>('male')
   const [bodyMassKg, setBodyMassKg] = useState(70)
   const [heightCm, setHeightCm] = useState(170)
   const [tempC, setTempC] = useState(20)
@@ -455,6 +509,13 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
             <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           </label>
           <label>
+            <span>{isEn ? 'Sex for reference ranges' : '目安表示の性別'}</span>
+            <select value={athleteSex} onChange={(event) => setAthleteSex(event.target.value as AthleteSex)}>
+              <option value="male">{isEn ? 'Male' : '男性'}</option>
+              <option value="female">{isEn ? 'Female' : '女性'}</option>
+            </select>
+          </label>
+          <label>
             <span>{isEn ? 'Body mass kg' : '体重 kg'}</span>
             <input type="number" min="20" step="0.1" value={bodyMassKg} onChange={(event) => setBodyMassKg(Number(event.target.value) || 70)} />
           </label>
@@ -586,8 +647,8 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
           <>
             <p className="fv-note fv-benchmark-note">
               {isEn
-                ? 'Reference ranges below are rough practical guides. They vary by sex, age, sport, body size, surface, timing method, and model assumptions; compare repeated tests from the same protocol most strongly.'
-                : '以下の目安は実践用の粗い参考レンジです。性別、年齢、競技レベル、体格、路面、測定方法、モデル設定で変わるため、最も重視すべきなのは同じ手順で測った経時変化です。'}
+                ? `Reference ranges below are rough practical guides for ${sexLabel(athleteSex, isEn)} athletes. They vary by age, sport, body size, surface, timing method, and model assumptions; compare repeated tests from the same protocol most strongly.`
+                : `以下の目安は${sexLabel(athleteSex, isEn)}選手向けの粗い実践用レンジです。年齢、競技レベル、体格、路面、測定方法、モデル設定で変わるため、最も重視すべきなのは同じ手順で測った経時変化です。`}
             </p>
 
             <div className="fv-result-grid fv-result-grid-detailed">
@@ -599,7 +660,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? '<7 low, 7–9 moderate/good, 9–11 high, >11 very high.' : '7未満：低め、7–9：標準〜良好、9–11：高い、11超：非常に高い。'}
+                  {guideText('f0', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
@@ -616,7 +677,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? '<7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high.' : '7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。'}
+                  {guideText('v0', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
@@ -633,7 +694,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? '<13 low, 13–18 moderate/good, 18–23 high, >23 very high.' : '13未満：低め、13–18：標準〜良好、18–23：高い、23超：非常に高い。'}
+                  {guideText('pmax', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
@@ -646,16 +707,16 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 <div className="fv-metric-head">
                   <span>RFmax</span>
                   <strong>{formatNumber(result.rfmax, 1)} %</strong>
-                  <small>{isEn ? 'Maximum ratio of force' : '最大水平力比'}</small>
+                  <small>{isEn ? 'Max after 0.3 s' : '0.3秒以降の最大値'}</small>
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? '<35 low, 35–45 moderate/good, >45 high. Elite acceleration can be higher.' : '35未満：低め、35–45：標準〜良好、45超：高い。高い加速能力を持つ選手ではさらに高値になり得ます。'}
+                  {guideText('rfmax', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
-                    ? 'RFmax estimates how effectively total force is oriented horizontally at the beginning of acceleration.'
-                    : 'RFmaxは、加速開始付近で発揮した力をどれだけ水平前方へ向けられているかの推定値です。単なる力の大きさではなく、力の向きの指標です。'}
+                    ? 'RFmax is now calculated as the maximal RF after 0.3 s, rather than the regression intercept at 0 s. It estimates how effectively total force is oriented horizontally in early acceleration.'
+                    : 'RFmaxは、0秒の回帰切片ではなく、0.3秒以降のRF最大値として計算します。加速初期に発揮した力をどれだけ水平前方へ向けられているかの推定値です。'}
                 </p>
               </div>
 
@@ -667,7 +728,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? 'About −6 to −10 is common. More negative than −10 suggests RF drops rapidly; closer to 0 means RF is maintained better, but interpret together with RFmax.' : '−6〜−10程度がよく見られる範囲です。−10より負に大きい場合は速度上昇に伴うRF低下が大きく、0に近いほどRFを維持しやすい傾向です。ただしRFmaxとセットで解釈します。'}
+                  {guideText('drf', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
@@ -684,7 +745,7 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                 </div>
                 <p className="fv-metric-guide">
                   <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
-                  {isEn ? 'MSS: <7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high. τ is often ~0.7–1.4 s; lower τ means quicker rise toward MSS.' : 'MSSは7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。τは概ね0.7–1.4秒程度が目安で、小さいほどMSSへの立ち上がりが速いことを示します。'}
+                  {guideText('mssTau', athleteSex, isEn)}
                 </p>
                 <p className="fv-metric-interpretation">
                   {isEn
