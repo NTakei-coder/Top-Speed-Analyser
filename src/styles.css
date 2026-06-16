@@ -2884,3 +2884,14 @@ video::-webkit-media-controls-start-playback-button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v62 sex-specific F–V benchmark selector */
+.fv-input-grid select {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 0 12px;
+  font-weight: 800;
+}
