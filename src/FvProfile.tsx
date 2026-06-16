@@ -346,7 +346,6 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
     tempC,
     pressureHpa,
   }), [frames, steps, fps, bodyMassKg, heightCm, tempC, pressureHpa])
-  const interpretation = useMemo(() => result ? makeInterpretation(result, isEn) : [], [result, isEn])
 
   useEffect(() => () => {
     if (videoUrl) URL.revokeObjectURL(videoUrl)
@@ -585,13 +584,114 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
         <h2>{isEn ? '3. F–V profile results' : '3. F–Vプロファイル結果'}</h2>
         {result ? (
           <>
-            <div className="fv-result-grid">
-              <div><span>F0</span><strong>{formatNumber(result.f0Rel, 2)} N/kg</strong><small>{formatNumber(result.f0Abs, 0)} N</small></div>
-              <div><span>V0</span><strong>{formatNumber(result.v0, 2)} m/s</strong><small>{isEn ? 'Theoretical' : '理論値'}</small></div>
-              <div><span>Pmax</span><strong>{formatNumber(result.pmaxRel, 2)} W/kg</strong><small>{formatNumber(result.pmaxAbs, 0)} W</small></div>
-              <div><span>RFmax</span><strong>{formatNumber(result.rfmax, 1)} %</strong><small>{isEn ? 'Force orientation' : '水平力比'}</small></div>
-              <div><span>DRF</span><strong>{formatNumber(result.drf, 2)} %/(m/s)</strong><small>{isEn ? 'RF slope' : 'RFの低下率'}</small></div>
-              <div><span>MSS</span><strong>{formatNumber(result.mss, 2)} m/s</strong><small>τ {formatNumber(result.tau, 2)} s</small></div>
+            <p className="fv-note fv-benchmark-note">
+              {isEn
+                ? 'Reference ranges below are rough practical guides. They vary by sex, age, sport, body size, surface, timing method, and model assumptions; compare repeated tests from the same protocol most strongly.'
+                : '以下の目安は実践用の粗い参考レンジです。性別、年齢、競技レベル、体格、路面、測定方法、モデル設定で変わるため、最も重視すべきなのは同じ手順で測った経時変化です。'}
+            </p>
+
+            <div className="fv-result-grid fv-result-grid-detailed">
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>F0</span>
+                  <strong>{formatNumber(result.f0Rel, 2)} N/kg</strong>
+                  <small>{formatNumber(result.f0Abs, 0)} N</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? '<7 low, 7–9 moderate/good, 9–11 high, >11 very high.' : '7未満：低め、7–9：標準〜良好、9–11：高い、11超：非常に高い。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'F0 estimates horizontal force capability at very low sprinting velocity. Use it to monitor the start and early-acceleration force side.'
+                    : 'F0は、低速度域での水平力発揮能力の推定値です。スタート〜初期加速でどれだけ前方へ大きな力を出せるかを見る指標として使います。'}
+                </p>
+              </div>
+
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>V0</span>
+                  <strong>{formatNumber(result.v0, 2)} m/s</strong>
+                  <small>{isEn ? 'Theoretical velocity intercept' : '理論的速度切片'}</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? '<7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high.' : '7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'V0 is the velocity-axis intercept of the horizontal F–V relationship. It is theoretical, so do not interpret it as actual maximal sprint speed.'
+                    : 'V0は、水平F–V関係の速度切片です。実際の最高速度そのものではなく、力–速度関係から外挿された理論値として解釈してください。'}
+                </p>
+              </div>
+
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>Pmax</span>
+                  <strong>{formatNumber(result.pmaxRel, 2)} W/kg</strong>
+                  <small>{formatNumber(result.pmaxAbs, 0)} W</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? '<13 low, 13–18 moderate/good, 18–23 high, >23 very high.' : '13未満：低め、13–18：標準〜良好、18–23：高い、23超：非常に高い。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'Pmax combines F0 and V0. If Pmax improves together with split times, the acceleration profile is generally improving.'
+                    : 'PmaxはF0とV0を統合した水平パワーの指標です。スプリットタイムの改善と同時にPmaxが上がる場合、加速能力が良い方向に変化している可能性が高いです。'}
+                </p>
+              </div>
+
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>RFmax</span>
+                  <strong>{formatNumber(result.rfmax, 1)} %</strong>
+                  <small>{isEn ? 'Maximum ratio of force' : '最大水平力比'}</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? '<35 low, 35–45 moderate/good, >45 high. Elite acceleration can be higher.' : '35未満：低め、35–45：標準〜良好、45超：高い。高い加速能力を持つ選手ではさらに高値になり得ます。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'RFmax estimates how effectively total force is oriented horizontally at the beginning of acceleration.'
+                    : 'RFmaxは、加速開始付近で発揮した力をどれだけ水平前方へ向けられているかの推定値です。単なる力の大きさではなく、力の向きの指標です。'}
+                </p>
+              </div>
+
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>DRF</span>
+                  <strong>{formatNumber(result.drf, 2)} %/(m/s)</strong>
+                  <small>{isEn ? 'RF decrease with velocity' : '速度上昇に伴うRF低下率'}</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? 'About −6 to −10 is common. More negative than −10 suggests RF drops rapidly; closer to 0 means RF is maintained better, but interpret together with RFmax.' : '−6〜−10程度がよく見られる範囲です。−10より負に大きい場合は速度上昇に伴うRF低下が大きく、0に近いほどRFを維持しやすい傾向です。ただしRFmaxとセットで解釈します。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'DRF describes how rapidly force orientation decreases as velocity rises. A less negative value is not automatically better if RFmax is low.'
+                    : 'DRFは、速度が上がるにつれて水平力比がどれだけ低下するかを示します。値が0に近いほど常に良いというより、RFmaxが十分高いかと合わせて見ます。'}
+                </p>
+              </div>
+
+              <div className="fv-metric-card">
+                <div className="fv-metric-head">
+                  <span>MSS / τ</span>
+                  <strong>{formatNumber(result.mss, 2)} m/s</strong>
+                  <small>τ {formatNumber(result.tau, 2)} s</small>
+                </div>
+                <p className="fv-metric-guide">
+                  <b>{isEn ? 'Guide' : '目安'}:</b>{' '}
+                  {isEn ? 'MSS: <7.5 low, 7.5–9.0 moderate/good, 9.0–10.5 high, >10.5 very high. τ is often ~0.7–1.4 s; lower τ means quicker rise toward MSS.' : 'MSSは7.5未満：低め、7.5–9.0：標準〜良好、9.0–10.5：高い、10.5超：非常に高い。τは概ね0.7–1.4秒程度が目安で、小さいほどMSSへの立ち上がりが速いことを示します。'}
+                </p>
+                <p className="fv-metric-interpretation">
+                  {isEn
+                    ? 'MSS is the modeled maximal sprinting speed from the acceleration curve. τ is the time constant of the velocity rise.'
+                    : 'MSSは加速曲線から推定されるモデル上の最大疾走速度です。τは速度がMSSへ近づく立ち上がりの時定数です。'}
+                </p>
+              </div>
             </div>
 
             <div className="fv-chart-grid">
@@ -646,11 +746,6 @@ function FvProfile({ language = 'ja' }: { language?: Language }) {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </div>
-
-            <div className="fv-interpretation">
-              <h3>{isEn ? 'Interpretation notes' : '解釈コメント'}</h3>
-              {interpretation.map((item) => <p key={item}>{item}</p>)}
             </div>
 
             <div className="fv-split-table">

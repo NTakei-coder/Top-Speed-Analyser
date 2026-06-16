@@ -2814,3 +2814,73 @@ video::-webkit-media-controls-start-playback-button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v61 F–V metric interpretation cards */
+.fv-benchmark-note {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.fv-result-grid-detailed {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.fv-metric-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+}
+
+.fv-metric-head {
+  display: grid;
+  gap: 6px;
+}
+
+.fv-metric-head span {
+  color: #475569;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.fv-metric-head strong {
+  color: #0f172a;
+  font-size: 1.35rem;
+}
+
+.fv-metric-head small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.fv-metric-guide,
+.fv-metric-interpretation {
+  margin: 0;
+  line-height: 1.65;
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.fv-metric-guide {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.fv-metric-guide b {
+  font-weight: 950;
+}
+
+@media (max-width: 860px) {
+  .fv-result-grid-detailed {
+    grid-template-columns: 1fr;
+  }
+}
